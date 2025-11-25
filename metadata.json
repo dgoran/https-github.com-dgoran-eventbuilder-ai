@@ -1,0 +1,5 @@
+{
+  "name": "EventBuilder AI",
+  "description": "An AI-powered application that generates comprehensive event plans, schedules, and task lists from natural language descriptions.",
+  "requestFramePermissions": []
+}
