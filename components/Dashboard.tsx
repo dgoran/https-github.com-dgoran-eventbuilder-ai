@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { EventPlan, IntegrationConfig, Speaker, FormField, AgendaItem, Task, EventBudget } from '../types';
 import { addRegistrant, getAdminSettings } from '../services/storageService';
+import { getApiUrl } from '../services/config';
 import {
   Calendar,
   CheckSquare,
@@ -79,13 +80,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const { eventId, payload } = event.data;
         if (eventId === eventPlan.id) {
           console.log('Received registration via iframe:', payload);
-          addRegistrant(eventId, payload);
+          await addRegistrant(eventId, payload);
           setLastRegistrant(payload.name);
           setTimeout(() => setLastRegistrant(null), 5000);
 
           // Relay registration to BigMarker if configured
           if (integrationConfig.type === 'bigmarker' && integrationConfig.platformId) {
-            const settings = getAdminSettings();
+            const settings = await getAdminSettings();
             if (settings.bigmarkerApiKey) {
                try {
                   const fullName = payload.name || '';
@@ -101,7 +102,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     }
                   });
 
-                  await fetch(`/api/bigmarker/api/v1/conferences/${integrationConfig.platformId}/register`, {
+                  await fetch(getApiUrl(`/api/bigmarker/api/v1/conferences/${integrationConfig.platformId}/register`), {
                     method: 'PUT',
                     headers: {
                       'Content-Type': 'application/json',
@@ -300,7 +301,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     try {
       // Use the standard Conference Detail endpoint which typically contains the custom_fields array
       // Proxy path: /api/bigmarker/api/v1/conferences/{id} -> https://www.bigmarker.com/api/v1/conferences/{id}
-      const response = await fetch(`/api/bigmarker/api/v1/conferences/${integrationConfig.platformId}`);
+      const response = await fetch(getApiUrl(`/api/bigmarker/api/v1/conferences/${integrationConfig.platformId}`));
 
       if (!response.ok) {
         const errorText = await response.text();

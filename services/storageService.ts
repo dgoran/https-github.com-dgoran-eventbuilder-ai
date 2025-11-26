@@ -1,128 +1,108 @@
 
 import { EventPlan, AdminSettings, Registrant } from '../types';
-
-const EVENTS_KEY = 'eventbuilder_events';
-const SETTINGS_KEY = 'eventbuilder_admin_settings';
+import { getApiUrl } from './config';
 
 // Helper to generate ID if missing
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 
-export const saveEvent = (event: EventPlan): void => {
-  const events = getEvents();
-
+export const saveEvent = async (event: EventPlan): Promise<void> => {
   // Ensure event has an ID before saving
   if (!event.id) {
     event.id = generateId();
   }
 
-  const index = events.findIndex(e => String(e.id) === String(event.id));
-  if (index >= 0) {
-    events[index] = event;
-  } else {
-    events.push(event);
-  }
-  localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
-};
-
-export const getEvents = (): EventPlan[] => {
-  const stored = localStorage.getItem(EVENTS_KEY);
-  if (!stored) return [];
-
   try {
-    const events = JSON.parse(stored);
-
-    // Data Migration: Ensure all events have IDs and createdAt to prevent delete errors
-    let modified = false;
-    const migratedEvents = events.map((e: any) => {
-      if (!e.id) {
-        e.id = generateId();
-        modified = true;
-      }
-      if (!e.createdAt) {
-        e.createdAt = Date.now();
-        modified = true;
-      }
-      return e as EventPlan;
+    // Try to update first (Upsert logic simulated by client)
+    const updateResponse = await fetch(getApiUrl(`/api/events/${event.id}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event)
     });
 
-    if (modified) {
-      localStorage.setItem(EVENTS_KEY, JSON.stringify(migratedEvents));
+    if (updateResponse.status === 404) {
+      // If not found, create new
+      const createResponse = await fetch(getApiUrl('/api/events'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event)
+      });
+      if (!createResponse.ok) throw new Error('Failed to create event');
+    } else if (!updateResponse.ok) {
+      throw new Error('Failed to update event');
     }
+  } catch (error) {
+    console.error("Error saving event to API:", error);
+    throw error;
+  }
+};
 
-    return migratedEvents;
-  } catch (e) {
-    console.error("Error parsing events from storage", e);
+export const getEvents = async (): Promise<EventPlan[]> => {
+  try {
+    const response = await fetch(getApiUrl('/api/events'));
+    if (!response.ok) throw new Error('Failed to fetch events');
+    const events: EventPlan[] = await response.json();
+    return events;
+  } catch (error) {
+    console.error("Error fetching events from API:", error);
     return [];
   }
 };
 
-export const deleteEvent = (id: string): boolean => {
-  if (!id) {
-    console.error("Cannot delete event: ID is missing.");
-    return false;
-  }
-
+export const deleteEvent = async (id: string): Promise<boolean> => {
+  if (!id) return false;
   const targetId = String(id).trim();
-  console.log(`Attempting to delete event with ID: "${targetId}"`);
-
-  const events = getEvents();
-  const initialCount = events.length;
-
-  // Filter out the event. We use String() and trim() on both sides to be absolutely sure.
-  const updatedEvents = events.filter(e => {
-    const currentId = String(e.id).trim();
-    return currentId !== targetId;
-  });
-
-  if (updatedEvents.length < initialCount) {
-    localStorage.setItem(EVENTS_KEY, JSON.stringify(updatedEvents));
-    console.log(`Event deleted successfully. Count reduced from ${initialCount} to ${updatedEvents.length}`);
-    return true;
-  } else {
-    console.warn(`Failed to delete event. ID "${targetId}" not found in list of ${initialCount} events.`);
-    console.log("Available IDs:", events.map(e => e.id));
+  
+  try {
+    const response = await fetch(getApiUrl(`/api/events/${targetId}`), {
+      method: 'DELETE'
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Error deleting event from API:", error);
     return false;
   }
 };
 
-export const addRegistrant = (eventId: string, data: { name: string; email: string; company?: string }): void => {
-  const events = getEvents();
-  const index = events.findIndex(e => String(e.id) === String(eventId));
+export const addRegistrant = async (eventId: string, data: { name: string; email: string; company?: string }): Promise<void> => {
+  try {
+    const newRegistrant: Registrant = {
+      id: generateId(),
+      name: data.name,
+      email: data.email,
+      company: data.company,
+      registeredAt: Date.now()
+    };
 
-  if (index >= 0) {
-    const event = events[index];
-    if (!event.registrants) {
-      event.registrants = [];
-    }
-
-    // Prevent duplicates based on email
-    const exists = event.registrants.some(r => r.email === data.email);
-    if (!exists) {
-      const newRegistrant: Registrant = {
-        id: generateId(),
-        name: data.name,
-        email: data.email,
-        company: data.company,
-        registeredAt: Date.now()
-      };
-      event.registrants.push(newRegistrant);
-      events[index] = event;
-      localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
-      console.log(`Added registrant ${data.email} to event ${eventId}`);
-    }
+    await fetch(getApiUrl(`/api/events/${eventId}/registrants`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newRegistrant)
+    });
+    console.log(`Added registrant ${data.email} to event ${eventId}`);
+  } catch (error) {
+    console.error("Error adding registrant via API:", error);
   }
 };
 
-export const saveAdminSettings = (settings: AdminSettings): void => {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+export const saveAdminSettings = async (settings: AdminSettings): Promise<void> => {
+  try {
+    await fetch(getApiUrl('/api/admin/config'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+  } catch (error) {
+    console.error("Error saving admin settings:", error);
+  }
 };
 
-export const getAdminSettings = (): AdminSettings => {
-  const stored = localStorage.getItem(SETTINGS_KEY);
-  return stored ? JSON.parse(stored) : {
-    zoomApiKey: '',
-    bigmarkerApiKey: '',
-    sendgridApiKey: '',
-    smtpHost: ''
-  };
+export const getAdminSettings = async (): Promise<AdminSettings> => {
+  try {
+    const response = await fetch(getApiUrl('/api/admin/config'));
+    if (!response.ok) return { zoomApiKey: '', bigmarkerApiKey: '', sendgridApiKey: '', smtpHost: '' };
+    return await response.json();
+  } catch (error) {
+    console.error("Error fetching admin settings:", error);
+    return { zoomApiKey: '', bigmarkerApiKey: '', sendgridApiKey: '', smtpHost: '' };
+  }
 };

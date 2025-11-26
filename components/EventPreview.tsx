@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { EventPlan } from '../types';
 import { Button, Input } from './UIComponents';
+import { getApiUrl } from '../services/config';
 
 interface EventPreviewProps {
   event: EventPlan;
@@ -101,7 +102,7 @@ export const EventPreview: React.FC<EventPreviewProps> = ({ event, onBack, onVie
       } else if (integration.type === 'none' || integration.type === 'email') {
         // NO INTEGRATION -> SEND EMAIL VIA BACKEND
         try {
-            const response = await fetch('/api/send-registration-email', {
+            const response = await fetch(getApiUrl('/api/send-registration-email'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

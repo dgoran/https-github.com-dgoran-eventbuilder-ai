@@ -27,8 +27,15 @@ const App: React.FC = () => {
   // Load events when in IDLE state (Generator view)
   useEffect(() => {
     if (appState === AppState.IDLE) {
-      const events = getEvents().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      setSavedEvents(events);
+      (async () => {
+        try {
+          const events = await getEvents();
+          events.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          setSavedEvents(events);
+        } catch (e) {
+          console.error("Failed to load events", e);
+        }
+      })();
     }
   }, [appState]);
 
@@ -38,7 +45,7 @@ const App: React.FC = () => {
     try {
       const plan = await generateEvent(prompt);
       setEventPlan(plan);
-      saveEvent(plan); // Persist immediately
+      await saveEvent(plan); // Persist immediately
       setAppState(AppState.VIEWING);
     } catch (err) {
       console.error(err);
@@ -63,11 +70,12 @@ const App: React.FC = () => {
     setDeleteConfirmationId(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deleteConfirmationId) {
-      deleteEvent(deleteConfirmationId);
-      const updatedEvents = getEvents().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      setSavedEvents(updatedEvents);
+      await deleteEvent(deleteConfirmationId);
+      const events = await getEvents();
+      events.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setSavedEvents(events);
       setDeleteConfirmationId(null);
     }
   };
@@ -78,7 +86,7 @@ const App: React.FC = () => {
     try {
       const updatedPlan = await updateEvent(eventPlan, instruction);
       setEventPlan(updatedPlan);
-      saveEvent(updatedPlan); // Update persistence
+      await saveEvent(updatedPlan); // Update persistence
     } catch (err) {
       console.error(err);
       alert("Could not update the event plan. Please try again.");
@@ -87,9 +95,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleManualUpdate = (updatedPlan: EventPlan) => {
+  const handleManualUpdate = async (updatedPlan: EventPlan) => {
     setEventPlan(updatedPlan);
-    saveEvent(updatedPlan);
+    await saveEvent(updatedPlan);
   };
 
   const handleGenerateWebsite = async () => {
@@ -106,7 +114,7 @@ const App: React.FC = () => {
       };
 
       setEventPlan(updatedPlan);
-      saveEvent(updatedPlan);
+      await saveEvent(updatedPlan);
     } catch (err) {
       console.error(err);
       alert("Could not generate website. Please try again.");

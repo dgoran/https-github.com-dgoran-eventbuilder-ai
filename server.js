@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
@@ -21,8 +22,11 @@ const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'e1cba1603207319c8075907676
 // In-memory cache
 let dbCache = null;
 
+// Enable Trust Proxy for Cloud Run / Load Balancers
+app.set('trust proxy', true);
+
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increased limit for images
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // --- HELPERS ---
@@ -300,9 +304,16 @@ app.put('/api/events/:id', async (req, res) => {
     const { id } = req.params;
     const updatedEvent = req.body;
     const db = await getDb();
-    db.events = (db.events || []).map(e => e.id === id ? updatedEvent : e);
-    await saveDb(db);
-    res.json(updatedEvent);
+    const index = (db.events || []).findIndex(e => e.id === id);
+    
+    if (index !== -1) {
+      db.events[index] = updatedEvent;
+      await saveDb(db);
+      res.json(updatedEvent);
+    } else {
+      // Return 404 if not found to allow client to decide whether to create
+      res.status(404).json({ error: "Event not found" });
+    }
   } catch (e) {
     res.status(500).json({ error: "Failed to update event" });
   }
@@ -317,6 +328,34 @@ app.delete('/api/events/:id', async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: "Failed to delete event" });
+  }
+});
+
+app.post('/api/events/:id/registrants', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const registrant = req.body; // { id, name, email, ... }
+    const db = await getDb();
+    const index = (db.events || []).findIndex(e => e.id === id);
+    
+    if (index !== -1) {
+      if (!db.events[index].registrants) db.events[index].registrants = [];
+      
+      // Prevent duplicates based on email
+      if (!db.events[index].registrants.some(r => r.email === registrant.email)) {
+        // Generate ID if missing
+        if (!registrant.id) registrant.id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+        if (!registrant.registeredAt) registrant.registeredAt = Date.now();
+        
+        db.events[index].registrants.push(registrant);
+        await saveDb(db);
+      }
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: "Event not found" });
+    }
+  } catch (e) {
+    res.status(500).json({ error: "Failed to add registrant" });
   }
 });
 
@@ -423,7 +462,6 @@ app.get('*', async (req, res) => {
     await fs.access(indexPath); // Check if file exists
     res.sendFile(indexPath);
   } catch (e) {
-    // If dist/index.html is missing (e.g. running only backend locally without build)
     res.send(`
       <div style="font-family:sans-serif; padding:20px; text-align:center;">
         <h1 style="color:#0284c7">EventBuilder AI Backend is Running</h1>

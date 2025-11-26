@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, Save, Key, Layout, LogOut, Users, X, Check, Activity, AlertCircle, Wifi } from 'lucide-react';
 import { EventPlan, AdminSettings, Registrant } from '../types';
 import { getEvents, deleteEvent, getAdminSettings, saveAdminSettings } from '../services/storageService';
+import { getApiUrl } from '../services/config';
 
 interface SuperAdminProps {
   onLogout: () => void;
@@ -31,7 +32,7 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
 
   const checkServerStatus = async () => {
     try {
-      const res = await fetch('/api/health');
+      const res = await fetch(getApiUrl('/api/health'));
       if (res.ok) {
         setServerStatus('online');
       } else {
@@ -42,15 +43,21 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
     }
   };
 
-  const loadData = () => {
-    const loadedEvents = getEvents();
-    // Sort by date created desc
-    loadedEvents.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    setEvents(loadedEvents);
-    setSettings(getAdminSettings());
+  const loadData = async () => {
+    try {
+      const loadedEvents = await getEvents();
+      // Sort by date created desc
+      loadedEvents.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setEvents(loadedEvents);
+      
+      const loadedSettings = await getAdminSettings();
+      setSettings(loadedSettings);
+    } catch (error) {
+      console.error("Failed to load admin data", error);
+    }
   };
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -62,7 +69,7 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
     }
 
     if (window.confirm('Are you sure you want to permanently delete this event?')) {
-      const success = deleteEvent(targetId);
+      const success = await deleteEvent(targetId);
 
       if (success) {
         // Optimistically remove from UI
@@ -81,9 +88,9 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
     }
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    saveAdminSettings(settings);
+    await saveAdminSettings(settings);
     setShowSuccessToast(true);
     setTimeout(() => setShowSuccessToast(false), 3000);
   };
@@ -98,7 +105,7 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
       // Attempt to fetch conferences list (page 1, 1 item) as a lightweight auth test
       // We send the key in the header to override the stored one if the user changed it but hasn't saved
       // IMPORTANT: Do NOT send Content-Type: application/json for GET requests, some APIs reject it.
-      const response = await fetch('/api/bigmarker/api/v1/conferences?page=1&per_page=1', {
+      const response = await fetch(getApiUrl('/api/bigmarker/api/v1/conferences?page=1&per_page=1'), {
         headers: { 
           'api-key': settings.bigmarkerApiKey.trim()
         }
