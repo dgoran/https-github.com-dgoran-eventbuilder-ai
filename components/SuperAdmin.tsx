@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trash2, Save, Key, Layout, LogOut, Users, X } from 'lucide-react';
+import { Trash2, Save, Key, Layout, LogOut, Users, X, Check, Activity, AlertCircle, Wifi } from 'lucide-react';
 import { EventPlan, AdminSettings, Registrant } from '../types';
 import { getEvents, deleteEvent, getAdminSettings, saveAdminSettings } from '../services/storageService';
 
@@ -20,13 +20,29 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
   });
   const [activeTab, setActiveTab] = useState<'events' | 'keys'>('events');
   const [selectedEventForRegistrants, setSelectedEventForRegistrants] = useState<EventPlan | null>(null);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
+  const [isTestingBigMarker, setIsTestingBigMarker] = useState(false);
 
   useEffect(() => {
     loadData();
+    checkServerStatus();
   }, []);
 
+  const checkServerStatus = async () => {
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        setServerStatus('online');
+      } else {
+        setServerStatus('offline');
+      }
+    } catch (e) {
+      setServerStatus('offline');
+    }
+  };
+
   const loadData = () => {
-    // getEvents now automatically patches missing IDs, so we can rely on them
     const loadedEvents = getEvents();
     // Sort by date created desc
     loadedEvents.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -35,16 +51,32 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
   };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
     e.stopPropagation();
+    
+    const targetId = String(id).trim();
+
+    if (!targetId) {
+      alert("Error: Cannot delete event with invalid ID.");
+      return;
+    }
+
     if (window.confirm('Are you sure you want to permanently delete this event?')) {
-      deleteEvent(id);
-      loadData();
-      
-      // Notify parent if the currently active event was deleted
-      if (currentEventId && String(id) === String(currentEventId)) {
-        if (onEventDeleted) {
-          onEventDeleted(id);
+      const success = deleteEvent(targetId);
+
+      if (success) {
+        // Optimistically remove from UI
+        setEvents(prevEvents => prevEvents.filter(ev => String(ev.id).trim() !== targetId));
+        
+        // Notify parent if the currently active event was deleted
+        if (currentEventId && String(currentEventId).trim() === targetId) {
+          if (onEventDeleted) {
+            onEventDeleted(targetId);
+          }
         }
+      } else {
+        alert("Could not delete event. It may have already been removed. Reloading list...");
+        loadData();
       }
     }
   };
@@ -52,7 +84,45 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     saveAdminSettings(settings);
-    alert('API Configuration Saved Successfully');
+    setShowSuccessToast(true);
+    setTimeout(() => setShowSuccessToast(false), 3000);
+  };
+
+  const handleTestBigMarker = async () => {
+    if (!settings.bigmarkerApiKey) {
+      alert("Please enter an API Key first.");
+      return;
+    }
+    setIsTestingBigMarker(true);
+    try {
+      // Attempt to fetch conferences list (page 1, 1 item) as a lightweight auth test
+      // We send the key in the header to override the stored one if the user changed it but hasn't saved
+      // IMPORTANT: Do NOT send Content-Type: application/json for GET requests, some APIs reject it.
+      const response = await fetch('/api/bigmarker/api/v1/conferences?page=1&per_page=1', {
+        headers: { 
+          'api-key': settings.bigmarkerApiKey.trim()
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Connection Successful! BigMarker API is responding.\n\nAccount seems valid.`);
+        console.log("BigMarker Test Response:", data);
+      } else {
+        const errText = await response.text();
+        let errMsg = errText;
+        try {
+           const jsonErr = JSON.parse(errText);
+           errMsg = jsonErr.error || jsonErr.details || jsonErr.message || JSON.stringify(jsonErr);
+        } catch (e) {} // use raw text if json parse fails
+        
+        alert(`Connection Failed (Status: ${response.status}).\n\nError: ${errMsg}`);
+      }
+    } catch (error: any) {
+      alert(`Network Error: ${error.message}\n\nEnsure the backend server is running.`);
+    } finally {
+      setIsTestingBigMarker(false);
+    }
   };
 
   const RegistrantsModal = () => {
@@ -108,9 +178,19 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 flex">
+    <div className="min-h-screen bg-slate-100 flex relative">
       <RegistrantsModal />
       
+      {/* Toast Notification */}
+      {showSuccessToast && (
+        <div className="fixed top-6 right-6 z-[100] bg-green-600 text-white px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-bounce-in">
+          <div className="bg-white/20 p-1 rounded-full">
+            <Check className="w-5 h-5" />
+          </div>
+          <span className="font-bold">API Configuration Saved Successfully</span>
+        </div>
+      )}
+
       {/* Admin Sidebar */}
       <aside className="w-64 bg-slate-900 text-white flex-shrink-0 flex flex-col h-screen sticky top-0">
         <div className="p-6 border-b border-slate-800">
@@ -132,6 +212,12 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
           </button>
         </nav>
         <div className="p-4 border-t border-slate-800">
+          <div className={`flex items-center gap-2 mb-4 text-xs font-medium ${
+            serverStatus === 'online' ? 'text-green-400' : 'text-red-400'
+          }`}>
+            {serverStatus === 'online' ? <Activity className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+            Backend: {serverStatus === 'checking' ? 'Checking...' : (serverStatus === 'online' ? 'Online' : 'Offline')}
+          </div>
           <button onClick={onLogout} className="w-full text-left px-4 py-2 text-slate-400 hover:text-white flex items-center gap-2">
             <LogOut className="w-4 h-4" /> Exit Admin
           </button>
@@ -188,8 +274,9 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
                       <td className="p-4 text-slate-500 text-sm">{event.budget.currency}{event.budget.totalBudget.toLocaleString()}</td>
                       <td className="p-4 text-right">
                         <button 
-                          onClick={(e) => handleDelete(e, event.id)}
-                          className="text-red-500 hover:text-red-700 p-2 rounded hover:bg-red-50 transition-colors inline-block"
+                          type="button"
+                          onClick={(e) => handleDelete(e, String(event.id))}
+                          className="text-red-500 hover:text-red-700 p-2 rounded hover:bg-red-50 transition-colors inline-block cursor-pointer"
                           title="Delete Event"
                         >
                           <Trash2 className="w-5 h-5" />
@@ -216,17 +303,32 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
                     <input 
                       type="password"
                       value={settings.zoomApiKey}
-                      onChange={e => setSettings({...settings, zoomApiKey: e.target.value})}
+                      onChange={e => setSettings({...settings, zoomApiKey: e.target.value.trim()})}
                       className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       placeholder="eyJhbGciOiJIUzI1NiJ9..."
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">BigMarker API Key</label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-sm font-medium text-slate-700">BigMarker API Key</label>
+                      <button 
+                        type="button"
+                        onClick={handleTestBigMarker}
+                        disabled={isTestingBigMarker}
+                        className="text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2 py-1 rounded border border-indigo-200 flex items-center gap-1 transition-colors"
+                      >
+                        {isTestingBigMarker ? (
+                          <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></span>
+                        ) : (
+                          <Wifi className="w-3 h-3" />
+                        )}
+                        Test Connection
+                      </button>
+                    </div>
                     <input 
                       type="password"
                       value={settings.bigmarkerApiKey}
-                      onChange={e => setSettings({...settings, bigmarkerApiKey: e.target.value})}
+                      onChange={e => setSettings({...settings, bigmarkerApiKey: e.target.value.trim()})}
                       className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       placeholder="bm_api_..."
                     />
@@ -244,7 +346,7 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
                     <input 
                       type="password"
                       value={settings.sendgridApiKey}
-                      onChange={e => setSettings({...settings, sendgridApiKey: e.target.value})}
+                      onChange={e => setSettings({...settings, sendgridApiKey: e.target.value.trim()})}
                       className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       placeholder="SG.xxxxx..."
                     />
@@ -254,17 +356,17 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
                     <input 
                       type="text"
                       value={settings.smtpHost}
-                      onChange={e => setSettings({...settings, smtpHost: e.target.value})}
+                      onChange={e => setSettings({...settings, smtpHost: e.target.value.trim()})}
                       className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                       placeholder="smtp.example.com"
                     />
                   </div>
                 </div>
               </div>
-
+              
               <button 
                 type="submit" 
-                className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center gap-2 shadow-lg shadow-indigo-200"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl flex items-center gap-2 transition-all shadow-lg shadow-indigo-200"
               >
                 <Save className="w-5 h-5" /> Save Configuration
               </button>

@@ -9,13 +9,13 @@ const generateId = () => Date.now().toString(36) + Math.random().toString(36).su
 
 export const saveEvent = (event: EventPlan): void => {
   const events = getEvents();
-  
+
   // Ensure event has an ID before saving
   if (!event.id) {
     event.id = generateId();
   }
 
-  const index = events.findIndex(e => e.id === event.id);
+  const index = events.findIndex(e => String(e.id) === String(event.id));
   if (index >= 0) {
     events[index] = event;
   } else {
@@ -27,10 +27,10 @@ export const saveEvent = (event: EventPlan): void => {
 export const getEvents = (): EventPlan[] => {
   const stored = localStorage.getItem(EVENTS_KEY);
   if (!stored) return [];
-  
+
   try {
     const events = JSON.parse(stored);
-    
+
     // Data Migration: Ensure all events have IDs and createdAt to prevent delete errors
     let modified = false;
     const migratedEvents = events.map((e: any) => {
@@ -56,30 +56,45 @@ export const getEvents = (): EventPlan[] => {
   }
 };
 
-export const deleteEvent = (id: string): void => {
+export const deleteEvent = (id: string): boolean => {
   if (!id) {
-    console.error("Cannot delete event without ID");
-    return;
+    console.error("Cannot delete event: ID is missing.");
+    return false;
   }
-  
+
+  const targetId = String(id).trim();
+  console.log(`Attempting to delete event with ID: "${targetId}"`);
+
   const events = getEvents();
-  // Filter out the event with the matching ID
-  const updatedEvents = events.filter(e => String(e.id) !== String(id));
-  
-  localStorage.setItem(EVENTS_KEY, JSON.stringify(updatedEvents));
-  console.log(`Event deleted: ${id}. Remaining: ${updatedEvents.length}`);
+  const initialCount = events.length;
+
+  // Filter out the event. We use String() and trim() on both sides to be absolutely sure.
+  const updatedEvents = events.filter(e => {
+    const currentId = String(e.id).trim();
+    return currentId !== targetId;
+  });
+
+  if (updatedEvents.length < initialCount) {
+    localStorage.setItem(EVENTS_KEY, JSON.stringify(updatedEvents));
+    console.log(`Event deleted successfully. Count reduced from ${initialCount} to ${updatedEvents.length}`);
+    return true;
+  } else {
+    console.warn(`Failed to delete event. ID "${targetId}" not found in list of ${initialCount} events.`);
+    console.log("Available IDs:", events.map(e => e.id));
+    return false;
+  }
 };
 
 export const addRegistrant = (eventId: string, data: { name: string; email: string; company?: string }): void => {
   const events = getEvents();
-  const index = events.findIndex(e => e.id === eventId);
-  
+  const index = events.findIndex(e => String(e.id) === String(eventId));
+
   if (index >= 0) {
     const event = events[index];
     if (!event.registrants) {
       event.registrants = [];
     }
-    
+
     // Prevent duplicates based on email
     const exists = event.registrants.some(r => r.email === data.email);
     if (!exists) {

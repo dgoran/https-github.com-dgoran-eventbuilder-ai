@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { EventPlan, IntegrationConfig } from "../types";
 
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const eventSchema: Schema = {
   type: Type.OBJECT,
@@ -90,7 +90,7 @@ const generateId = () => {
 export const generateEvent = async (userPrompt: string): Promise<EventPlan> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-exp",
       contents: `Generate a detailed professional LIVE STREAM WEBINAR event plan based on this request: "${userPrompt}". 
       
       CRITICAL INSTRUCTIONS:
@@ -111,12 +111,12 @@ export const generateEvent = async (userPrompt: string): Promise<EventPlan> => {
 
     const text = response.text;
     if (!text) throw new Error("No response from AI");
-    
+
     const parsed = JSON.parse(text) as EventPlan;
     // Inject ID and CreatedAt on generation
     parsed.id = generateId();
     parsed.createdAt = Date.now();
-    
+
     return parsed;
   } catch (error) {
     console.error("Error generating event:", error);
@@ -125,12 +125,14 @@ export const generateEvent = async (userPrompt: string): Promise<EventPlan> => {
 };
 
 export const updateEvent = async (currentPlan: EventPlan, instruction: string): Promise<EventPlan> => {
-   try {
-    const { websiteHtml, ...planWithoutHtml } = currentPlan;
+  try {
+    // Exclude fields that shouldn't be touched by the AI directly in the prompt context to avoid confusion, 
+    // though we handle preservation below.
+    const { websiteHtml, headerImageUrl, ...planWithoutHeavyFields } = currentPlan;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Current Webinar Plan JSON: ${JSON.stringify(planWithoutHtml)}. 
+      model: "gemini-2.0-flash-exp",
+      contents: `Current Webinar Plan JSON: ${JSON.stringify(planWithoutHeavyFields)}. 
       
       User Instruction for modification: "${instruction}".
       
@@ -140,20 +142,32 @@ export const updateEvent = async (currentPlan: EventPlan, instruction: string): 
       config: {
         responseMimeType: "application/json",
         responseSchema: eventSchema,
-        temperature: 0.4, 
+        temperature: 0.4,
       },
     });
 
     const text = response.text;
     if (!text) throw new Error("No response from AI");
-    
+
     const updatedPlan = JSON.parse(text) as EventPlan;
-    
+
     // Restore preserved fields
     updatedPlan.id = currentPlan.id;
     updatedPlan.createdAt = currentPlan.createdAt;
+
+    // Restore Images & HTML
     if (websiteHtml) updatedPlan.websiteHtml = websiteHtml;
+    if (headerImageUrl) updatedPlan.headerImageUrl = headerImageUrl;
     if (currentPlan.integrationConfig) updatedPlan.integrationConfig = currentPlan.integrationConfig;
+
+    // Restore custom speaker images
+    updatedPlan.speakers = updatedPlan.speakers.map(s => {
+      const existing = currentPlan.speakers.find(ex => ex.id === s.id);
+      if (existing && existing.customImageUrl) {
+        return { ...s, customImageUrl: existing.customImageUrl };
+      }
+      return s;
+    });
 
     return updatedPlan;
   } catch (error) {
@@ -165,7 +179,7 @@ export const updateEvent = async (currentPlan: EventPlan, instruction: string): 
 export const generateWebsiteCode = async (eventPlan: EventPlan, integration: IntegrationConfig): Promise<string> => {
   try {
     let integrationInstructions = "";
-    
+
     // The ID injection allows the site to communicate back to the specific event bucket in the backend
     const commonScript = `
       <script>
@@ -186,11 +200,9 @@ export const generateWebsiteCode = async (eventPlan: EventPlan, integration: Int
                   type: 'EVENT_REGISTRATION',
                   eventId: '${eventPlan.id}',
                   payload: {
-                    first_name: data['first_name'],
-                    last_name: data['last_name'],
+                    ...data, // Capture all custom fields
                     name: data.name || (data['first_name'] + ' ' + data['last_name']),
                     email: data.email,
-                    company: data.company
                   }
                 }, '*');
               }
@@ -208,7 +220,50 @@ export const generateWebsiteCode = async (eventPlan: EventPlan, integration: Int
       </script>
     `;
 
-    if (integration.type === 'zoom') {
+    // Dynamic Form Generation Logic for BigMarker
+    if (integration.type === 'bigmarker' && integration.customFields && integration.customFields.length > 0) {
+
+      const formFieldsHtml = integration.customFields.map(field => {
+        if (field.type === 'checkbox') {
+          return `
+            <div className="flex items-center mb-4">
+              <input type="checkbox" name="${field.id}" id="${field.id}" ${field.required ? 'required' : ''} class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
+              <label for="${field.id}" class="ml-2 text-sm text-gray-700">${field.label}</label>
+            </div>`;
+        } else {
+          return `
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-bold mb-2" for="${field.id}">
+                ${field.label} ${field.required ? '*' : ''}
+              </label>
+              <input 
+                class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
+                id="${field.id}" 
+                name="${field.id}" 
+                type="${field.type}" 
+                ${field.required ? 'required' : ''}
+                placeholder="${field.label}"
+              >
+            </div>`;
+        }
+      }).join('');
+
+      integrationInstructions = `
+        Use the exact HTML below for the Registration Form inside the registration area. 
+        Do not create your own form fields. Use these pre-configured fields that match the BigMarker API:
+        
+        <form class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+           ${formFieldsHtml}
+           <div class="flex items-center justify-between">
+            <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full" type="button">
+              Register Now
+            </button>
+          </div>
+        </form>
+
+        Add the script tag provided below at the end of the body.
+      `;
+    } else if (integration.type === 'zoom') {
       integrationInstructions = `
         Create a registration form that simulates a Zoom Webinar Registration.
         Form fields: First Name (name="first_name"), Last Name (name="last_name"), Email (name="email").
@@ -216,14 +271,15 @@ export const generateWebsiteCode = async (eventPlan: EventPlan, integration: Int
         Add the script tag provided below at the end of the body.
       `;
     } else if (integration.type === 'bigmarker') {
-       integrationInstructions = `
+      // Fallback for BigMarker if no fields synced
+      integrationInstructions = `
         Create a registration form that simulates a BigMarker Webinar Registration.
         Form fields: First Name (name="first_name"), Last Name (name="last_name"), Email (name="email").
         Button Text: "Save my Spot on BigMarker".
         Add the script tag provided below at the end of the body.
       `;
     } else {
-       integrationInstructions = `
+      integrationInstructions = `
         Create a generic "No-Code" email registration form.
         Form fields: Name (name="name"), Email (name="email").
         Button Text: "Register Now".
@@ -233,12 +289,14 @@ export const generateWebsiteCode = async (eventPlan: EventPlan, integration: Int
 
     const speakersHtml = eventPlan.speakers.map(s => `
       <div class="bg-white p-6 rounded-xl shadow-md flex flex-col items-center text-center">
-        <img src="https://i.pravatar.cc/150?u=${s.id}" alt="${s.name}" class="w-24 h-24 rounded-full mb-4 object-cover border-4 border-indigo-50">
+        <img src="${s.customImageUrl || `https://i.pravatar.cc/150?u=${s.id}`}" alt="${s.name}" class="w-24 h-24 rounded-full mb-4 object-cover border-4 border-indigo-50">
         <h3 class="text-xl font-bold text-slate-900">${s.name}</h3>
         <p class="text-indigo-600 font-medium mb-2">${s.role}</p>
         <p class="text-slate-600 text-sm">${s.bio}</p>
       </div>
     `).join('');
+
+    const heroImageSrc = eventPlan.headerImageUrl || `https://picsum.photos/seed/${eventPlan.imageKeyword}/1200/600`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -265,7 +323,7 @@ export const generateWebsiteCode = async (eventPlan: EventPlan, integration: Int
       - DO NOT use any external CSS files other than Tailwind CDN.
       - Use <script src="https://cdn.tailwindcss.com"></script>
       - Design must be modern, high-conversion, focused on getting people to register.
-      - Use "https://picsum.photos/seed/${eventPlan.imageKeyword}/1200/600" for the Hero background image (add overlay for text readability).
+      - Use "${heroImageSrc}" for the Hero background image (add overlay for text readability).
       - Return ONLY the raw HTML code. Do not include markdown formatting like \`\`\`html.
       
       Embed this raw HTML for the speakers list into the Speakers Section container:
@@ -278,10 +336,10 @@ export const generateWebsiteCode = async (eventPlan: EventPlan, integration: Int
 
     let text = response.text;
     if (!text) throw new Error("No response from AI");
-    
+
     // Cleanup markdown if strictly present
     text = text.replace(/^```html/, '').replace(/```$/, '').trim();
-    
+
     return text;
   } catch (error) {
     console.error("Error generating website:", error);

@@ -1,24 +1,36 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { Generator } from './components/Generator';
 import { SuperAdmin } from './components/SuperAdmin';
+import { Modal, Button } from './components/UIComponents';
 import { generateEvent, updateEvent, generateWebsiteCode } from './services/aiService';
-import { saveEvent } from './services/storageService';
+import { saveEvent, getEvents, deleteEvent } from './services/storageService';
 import { EventPlan, AppState, IntegrationConfig } from './types';
 import { AlertCircle, Lock } from 'lucide-react';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
   const [eventPlan, setEventPlan] = useState<EventPlan | null>(null);
+  const [savedEvents, setSavedEvents] = useState<EventPlan[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+
   const [isGeneratingWebsite, setIsGeneratingWebsite] = useState(false);
-  
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
+
   // Default Integration Config
   const [integrationConfig, setIntegrationConfig] = useState<IntegrationConfig>({
     type: 'zoom',
   });
+
+  // Load events when in IDLE state (Generator view)
+  useEffect(() => {
+    if (appState === AppState.IDLE) {
+      const events = getEvents().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setSavedEvents(events);
+    }
+  }, [appState]);
 
   const handleGenerate = async (prompt: string) => {
     setAppState(AppState.GENERATING);
@@ -32,6 +44,31 @@ const App: React.FC = () => {
       console.error(err);
       setError("Failed to generate event plan. Please check your API key and try again.");
       setAppState(AppState.IDLE);
+    }
+  };
+
+  const handleSelectEvent = (event: EventPlan) => {
+    setEventPlan(event);
+    // Restore integration config if it exists, otherwise default to Zoom
+    if (event.integrationConfig) {
+      setIntegrationConfig(event.integrationConfig);
+    } else {
+      setIntegrationConfig({ type: 'zoom' });
+    }
+    setAppState(AppState.VIEWING);
+  };
+
+  const handleDeleteEvent = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeleteConfirmationId(id);
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirmationId) {
+      deleteEvent(deleteConfirmationId);
+      const updatedEvents = getEvents().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setSavedEvents(updatedEvents);
+      setDeleteConfirmationId(null);
     }
   };
 
@@ -50,24 +87,29 @@ const App: React.FC = () => {
     }
   };
 
+  const handleManualUpdate = (updatedPlan: EventPlan) => {
+    setEventPlan(updatedPlan);
+    saveEvent(updatedPlan);
+  };
+
   const handleGenerateWebsite = async () => {
     if (!eventPlan) return;
     setIsGeneratingWebsite(true);
     try {
       // Pass integration config to website generator
       const html = await generateWebsiteCode(eventPlan, integrationConfig);
-      
-      const updatedPlan = { 
-        ...eventPlan, 
+
+      const updatedPlan = {
+        ...eventPlan,
         websiteHtml: html,
-        integrationConfig: integrationConfig 
+        integrationConfig: integrationConfig
       };
-      
+
       setEventPlan(updatedPlan);
       saveEvent(updatedPlan);
     } catch (err) {
-       console.error(err);
-       alert("Could not generate website. Please try again.");
+      console.error(err);
+      alert("Could not generate website. Please try again.");
     } finally {
       setIsGeneratingWebsite(false);
     }
@@ -104,17 +146,18 @@ const App: React.FC = () => {
   return (
     <>
       <ErrorBanner />
-      
+
       {appState === AppState.ADMIN ? (
-        <SuperAdmin 
-          onLogout={() => setAppState(AppState.IDLE)} 
+        <SuperAdmin
+          onLogout={() => setAppState(AppState.IDLE)}
           currentEventId={eventPlan?.id}
           onEventDeleted={handleCurrentEventDeleted}
         />
       ) : appState === AppState.VIEWING && eventPlan ? (
-        <Dashboard 
-          eventPlan={eventPlan} 
+        <Dashboard
+          eventPlan={eventPlan}
           onUpdate={handleUpdate}
+          onManualUpdate={handleManualUpdate}
           isUpdating={isUpdating}
           onGenerateWebsite={handleGenerateWebsite}
           isGeneratingWebsite={isGeneratingWebsite}
@@ -124,22 +167,46 @@ const App: React.FC = () => {
         />
       ) : (
         <>
-          <Generator 
-            onGenerate={handleGenerate} 
-            isLoading={appState === AppState.GENERATING} 
+          <Generator
+            onGenerate={handleGenerate}
+            isLoading={appState === AppState.GENERATING}
+            savedEvents={savedEvents}
+            onSelectEvent={handleSelectEvent}
+            onDeleteEvent={handleDeleteEvent}
           />
           {/* Admin Toggle - Bottom Right */}
           <div className="fixed bottom-4 right-4 z-50">
-             <button 
+            <button
               onClick={toggleAdmin}
               className="bg-slate-800 hover:bg-slate-900 text-slate-400 hover:text-white p-3 rounded-full shadow-lg transition-all"
               title="SuperAdmin Login"
-             >
-               <Lock className="w-4 h-4" />
-             </button>
+            >
+              <Lock className="w-4 h-4" />
+            </button>
           </div>
         </>
       )}
+
+
+      <Modal
+        isOpen={!!deleteConfirmationId}
+        onClose={() => setDeleteConfirmationId(null)}
+        title="Delete Event"
+      >
+        <div className="space-y-6">
+          <p className="text-slate-600">
+            Are you sure you want to delete this event? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setDeleteConfirmationId(null)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={confirmDelete}>
+              Delete Event
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 };

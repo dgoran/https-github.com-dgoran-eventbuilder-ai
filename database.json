@@ -1,0 +1,13 @@
+{
+  "bigMarkerApiKey": "",
+  "zoomApiKey": "",
+  "vimeoApiKey": "",
+  "geminiApiKey": "",
+  "defaultProxyUrl": "/api/bigmarker",
+  "smtpHost": "",
+  "smtpPort": "",
+  "smtpUser": "",
+  "smtpPass": "",
+  "smtpFrom": "",
+  "events": []
+}

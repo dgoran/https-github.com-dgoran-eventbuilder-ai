@@ -4,6 +4,8 @@ export interface Speaker {
   name: string;
   role: string;
   bio: string;
+  customImageUrl?: string; // Base64 string for user uploaded image
+  imageUrl?: string; // Alias for customImageUrl in some components
 }
 
 export interface AgendaItem {
@@ -14,6 +16,7 @@ export interface AgendaItem {
   durationMinutes: number;
   type: 'keynote' | 'break' | 'workshop' | 'networking' | 'panel' | 'other';
   imageKeyword?: string;
+  speaker?: string; // Present in some views
 }
 
 export interface Task {
@@ -40,19 +43,22 @@ export interface Registrant {
   email: string;
   company?: string;
   registeredAt: number;
+  customData?: Record<string, string>; // To store extra fields from BigMarker forms
 }
 
 export interface EventPlan {
-  id: string; // Added for persistence
-  createdAt: number; // Added for sorting
+  id: string;
+  createdAt: number;
   title: string;
   description: string;
   theme: string;
   targetAudience: string;
   estimatedAttendees: number;
   date: string;
-  location: string; // Will default to "Online / Webinar"
-  imageKeyword: string; // For generating placeholder images
+  location: string;
+  imageKeyword: string;
+  headerImageUrl?: string; // Base64 string for custom header
+  coverImage?: string; // Alias for headerImageUrl
   speakers: Speaker[];
   agenda: AgendaItem[];
   tasks: Task[];
@@ -61,11 +67,25 @@ export interface EventPlan {
   websiteHtml?: string;
   integrationConfig?: IntegrationConfig;
   registrants?: Registrant[];
+  pageViews?: number;
+}
+
+export interface FormField {
+  id: string;
+  label: string;
+  type: 'text' | 'email' | 'checkbox' | 'select';
+  required: boolean;
+  options?: string[]; // For select lists
 }
 
 export interface IntegrationConfig {
   type: 'zoom' | 'bigmarker' | 'email' | 'none';
-  platformId?: string; // Webinar ID
+  platformId?: string;
+  customFields?: FormField[]; // Fields synced from the platform
+  // Compatibility fields for preview components
+  apiKey?: string;
+  proxyUrl?: string;
+  isMock?: boolean;
 }
 
 export interface AdminSettings {
@@ -75,10 +95,37 @@ export interface AdminSettings {
   smtpHost?: string;
 }
 
+export interface SystemConfig {
+  geminiApiKey: string;
+  bigMarkerApiKey: string;
+  zoomApiKey: string;
+  vimeoApiKey: string;
+  smtpHost: string;
+  smtpPort: string;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFrom: string;
+}
+
 export enum AppState {
   IDLE = 'IDLE',
   GENERATING = 'GENERATING',
   VIEWING = 'VIEWING',
-  ADMIN = 'ADMIN', // Added Admin state
+  ADMIN = 'ADMIN',
   ERROR = 'ERROR'
+}
+
+export interface AIContentResponse {
+  title: string;
+  description: string;
+  agenda: {
+    time: string;
+    title: string;
+    speaker: string;
+  }[];
+  suggestedSpeakers: {
+    name: string;
+    role: string;
+    bio: string;
+  }[];
 }

@@ -1,12 +1,23 @@
+
 import React, { useState } from 'react';
-import { Sparkles, Calendar, ArrowRight, Activity } from 'lucide-react';
+import { Sparkles, Calendar, ArrowRight, Activity, Trash2, Clock, MapPin } from 'lucide-react';
+import { EventPlan } from '../types';
 
 interface GeneratorProps {
   onGenerate: (prompt: string) => void;
   isLoading: boolean;
+  savedEvents: EventPlan[];
+  onSelectEvent: (event: EventPlan) => void;
+  onDeleteEvent: (e: React.MouseEvent, id: string) => void;
 }
 
-export const Generator: React.FC<GeneratorProps> = ({ onGenerate, isLoading }) => {
+export const Generator: React.FC<GeneratorProps> = ({ 
+  onGenerate, 
+  isLoading, 
+  savedEvents, 
+  onSelectEvent, 
+  onDeleteEvent 
+}) => {
   const [prompt, setPrompt] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -23,7 +34,7 @@ export const Generator: React.FC<GeneratorProps> = ({ onGenerate, isLoading }) =
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8">
       <div className="max-w-2xl w-full">
         <div className="text-center mb-10 space-y-4">
           <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-sm border border-slate-100 mb-4">
@@ -84,6 +95,50 @@ export const Generator: React.FC<GeneratorProps> = ({ onGenerate, isLoading }) =
           </div>
         </div>
       </div>
+
+      {/* Existing Events List */}
+      {savedEvents.length > 0 && (
+        <div className="max-w-4xl w-full mt-16 border-t border-slate-200 pt-10 animate-fadeIn">
+          <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+             <Clock className="w-5 h-5 text-indigo-500" /> Your Events
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {savedEvents.map(event => (
+               <div 
+                   key={event.id}
+                   onClick={() => onSelectEvent(event)}
+                   className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-400 hover:shadow-lg transition-all cursor-pointer relative group flex flex-col justify-between h-40"
+               >
+                   <div>
+                       <div className="flex justify-between items-start mb-2">
+                           <h3 className="font-bold text-slate-800 line-clamp-1 pr-6 text-lg" title={event.title}>{event.title}</h3>
+                           <span className="bg-indigo-50 text-indigo-600 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold shrink-0">{event.theme.slice(0, 12)}</span>
+                       </div>
+                       <p className="text-xs text-slate-500 flex items-center gap-1 mb-1">
+                           <Calendar className="w-3 h-3" /> {event.date}
+                       </p>
+                       <p className="text-xs text-slate-500 flex items-center gap-1">
+                           <MapPin className="w-3 h-3" /> {event.location}
+                       </p>
+                   </div>
+                   
+                   <p className="text-xs text-slate-400 mt-2 line-clamp-1 italic">{event.marketingTagline}</p>
+                   
+                   <button 
+                       onClick={(e) => {
+                         e.stopPropagation(); // CRITICAL: Stop propagation here to prevent opening the event
+                         onDeleteEvent(e, event.id);
+                       }}
+                       className="absolute top-4 right-4 text-slate-300 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 rounded-full z-10"
+                       title="Delete Event"
+                   >
+                       <Trash2 className="w-4 h-4" />
+                   </button>
+               </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
