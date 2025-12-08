@@ -88,47 +88,46 @@ async function getDb() {
   if (dbCache) return dbCache;
 
   try {
+    // Try to read from disk
     try {
       await fs.access(DB_PATH);
-    } catch {
-      dbCache = createDefaultDb();
-      await saveDb(dbCache);
-      return dbCache;
-    }
-
-    const data = await fs.readFile(DB_PATH, 'utf8');
-
-    if (!data || data.trim() === '') {
-      dbCache = createDefaultDb();
-      return dbCache;
-    }
-
-    try {
-      const parsed = JSON.parse(data);
-      if (!parsed || typeof parsed !== 'object') {
+      const data = await fs.readFile(DB_PATH, 'utf8');
+      if (!data || data.trim() === '') {
         dbCache = createDefaultDb();
       } else {
-        dbCache = parsed;
+        try {
+          const parsed = JSON.parse(data);
+          dbCache = (parsed && typeof parsed === 'object') ? parsed : createDefaultDb();
+        } catch (jsonError) {
+          console.warn("Database corrupted. Resetting defaults.");
+          dbCache = createDefaultDb();
+        }
       }
-    } catch (jsonError) {
-      console.warn("Database corrupted. Resetting defaults.");
+    } catch (err) {
+      // File doesn't exist or cannot be accessed
+      console.log("Database file not found or inaccessible. Creating new default DB in memory.");
       dbCache = createDefaultDb();
+      // Try to save the new default to disk, but don't block if it fails (read-only fs)
+      await saveDb(dbCache).catch(() => {}); 
     }
     return dbCache;
   } catch (e) {
-    console.error("DB Read Error:", e);
+    console.error("Critical DB Error:", e);
     return createDefaultDb();
   }
 }
 
 async function saveDb(data) {
-  // Update cache immediately
+  // Update cache immediately (Source of truth for the session)
   dbCache = data;
+  
   try {
+    // Attempt to persist to disk
     await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
   } catch (e) {
-    console.error("DB Save Error:", e);
-    throw e;
+    // In Cloud Run or read-only environments, this will fail. 
+    // We log it but don't throw, allowing the app to run with in-memory persistence for the session.
+    console.warn("Storage Warning: Could not write to database.json. Data will be lost on restart. (This is expected in ephemeral environments without a mounted volume)", e.message);
   }
 }
 
@@ -455,21 +454,10 @@ app.all('/api/zoom/*', async (req, res) => {
   }
 });
 
-// Fallback for serving index.html even if build missing (prevents hard crash on dev)
-app.get('*', async (req, res) => {
-  try {
-    const indexPath = path.join(__dirname, 'dist', 'index.html');
-    await fs.access(indexPath); // Check if file exists
-    res.sendFile(indexPath);
-  } catch (e) {
-    res.send(`
-      <div style="font-family:sans-serif; padding:20px; text-align:center;">
-        <h1 style="color:#0284c7">EventBuilder AI Backend is Running</h1>
-        <p>The frontend build was not found in <code>/dist</code>.</p>
-        <p>To use the app, please run <code>npm run dev</code> in another terminal to start the frontend development server.</p>
-      </div>
-    `);
-  }
+// Handle React routing, return all requests to React app
+// This must be the LAST route
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {

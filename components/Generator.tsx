@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Sparkles, Calendar, ArrowRight, Activity, Trash2, Clock, MapPin } from 'lucide-react';
+import { Sparkles, Calendar, ArrowRight, Activity, Trash2, Clock, MapPin, Wifi, WifiOff } from 'lucide-react';
 import { EventPlan } from '../types';
 
 interface GeneratorProps {
@@ -9,6 +9,7 @@ interface GeneratorProps {
   savedEvents: EventPlan[];
   onSelectEvent: (event: EventPlan) => void;
   onDeleteEvent: (e: React.MouseEvent, id: string) => void;
+  isOffline?: boolean;
 }
 
 export const Generator: React.FC<GeneratorProps> = ({ 
@@ -16,7 +17,8 @@ export const Generator: React.FC<GeneratorProps> = ({
   isLoading, 
   savedEvents, 
   onSelectEvent, 
-  onDeleteEvent 
+  onDeleteEvent,
+  isOffline = false
 }) => {
   const [prompt, setPrompt] = useState('');
 
@@ -34,7 +36,18 @@ export const Generator: React.FC<GeneratorProps> = ({
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8 relative">
+      
+      {/* Server Status Badge */}
+      <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-sm transition-all duration-500 ${isOffline ? 'bg-red-100 text-red-600 border border-red-200' : 'bg-green-100 text-green-700 border border-green-200'}`}>
+        <div className={`w-2 h-2 rounded-full ${isOffline ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`}></div>
+        {isOffline ? (
+          <span className="flex items-center gap-1"><WifiOff className="w-3 h-3" /> Offline</span>
+        ) : (
+          <span className="flex items-center gap-1"><Wifi className="w-3 h-3" /> System Online</span>
+        )}
+      </div>
+
       <div className="max-w-2xl w-full">
         <div className="text-center mb-10 space-y-4">
           <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-sm border border-slate-100 mb-4">

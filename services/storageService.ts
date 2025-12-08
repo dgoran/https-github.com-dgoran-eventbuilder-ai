@@ -5,6 +5,43 @@ import { getApiUrl } from './config';
 // Helper to generate ID if missing
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 
+// Helper for robust fetching with exponential backoff
+const fetchWithRetry = async (url: string, options?: RequestInit, retries = 3, delay = 500): Promise<Response> => {
+  try {
+    const response = await fetch(url, options);
+    // Retry on 5xx server errors (common during cold starts)
+    if (!response.ok && response.status >= 500 && retries > 0) {
+      throw new Error(`Server Error: ${response.status}`);
+    }
+    return response;
+  } catch (error) {
+    if (retries <= 0) throw error;
+    
+    // Wait for the specified delay
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    // Retry with increased delay (exponential backoff)
+    console.log(`Retrying API call to ${url}... attempts left: ${retries}`);
+    return fetchWithRetry(url, options, retries - 1, delay * 2);
+  }
+};
+
+export const checkServerHealth = async (): Promise<boolean> => {
+  try {
+    // Short timeout for health check
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    
+    const response = await fetch(getApiUrl('/api/health'), { 
+      signal: controller.signal 
+    });
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch (e) {
+    return false;
+  }
+};
+
 export const saveEvent = async (event: EventPlan): Promise<void> => {
   // Ensure event has an ID before saving
   if (!event.id) {
@@ -13,7 +50,7 @@ export const saveEvent = async (event: EventPlan): Promise<void> => {
 
   try {
     // Try to update first (Upsert logic simulated by client)
-    const updateResponse = await fetch(getApiUrl(`/api/events/${event.id}`), {
+    const updateResponse = await fetchWithRetry(getApiUrl(`/api/events/${event.id}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event)
@@ -21,7 +58,7 @@ export const saveEvent = async (event: EventPlan): Promise<void> => {
 
     if (updateResponse.status === 404) {
       // If not found, create new
-      const createResponse = await fetch(getApiUrl('/api/events'), {
+      const createResponse = await fetchWithRetry(getApiUrl('/api/events'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(event)
@@ -38,13 +75,13 @@ export const saveEvent = async (event: EventPlan): Promise<void> => {
 
 export const getEvents = async (): Promise<EventPlan[]> => {
   try {
-    const response = await fetch(getApiUrl('/api/events'));
+    const response = await fetchWithRetry(getApiUrl('/api/events'));
     if (!response.ok) throw new Error('Failed to fetch events');
     const events: EventPlan[] = await response.json();
     return events;
   } catch (error) {
     console.error("Error fetching events from API:", error);
-    return [];
+    throw error; // Rethrow to let caller handle offline state
   }
 };
 
@@ -53,7 +90,7 @@ export const deleteEvent = async (id: string): Promise<boolean> => {
   const targetId = String(id).trim();
   
   try {
-    const response = await fetch(getApiUrl(`/api/events/${targetId}`), {
+    const response = await fetchWithRetry(getApiUrl(`/api/events/${targetId}`), {
       method: 'DELETE'
     });
     return response.ok;
@@ -73,7 +110,7 @@ export const addRegistrant = async (eventId: string, data: { name: string; email
       registeredAt: Date.now()
     };
 
-    await fetch(getApiUrl(`/api/events/${eventId}/registrants`), {
+    await fetchWithRetry(getApiUrl(`/api/events/${eventId}/registrants`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newRegistrant)
@@ -86,7 +123,7 @@ export const addRegistrant = async (eventId: string, data: { name: string; email
 
 export const saveAdminSettings = async (settings: AdminSettings): Promise<void> => {
   try {
-    await fetch(getApiUrl('/api/admin/config'), {
+    await fetchWithRetry(getApiUrl('/api/admin/config'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(settings)
@@ -98,7 +135,7 @@ export const saveAdminSettings = async (settings: AdminSettings): Promise<void> 
 
 export const getAdminSettings = async (): Promise<AdminSettings> => {
   try {
-    const response = await fetch(getApiUrl('/api/admin/config'));
+    const response = await fetchWithRetry(getApiUrl('/api/admin/config'));
     if (!response.ok) return { zoomApiKey: '', bigmarkerApiKey: '', sendgridApiKey: '', smtpHost: '' };
     return await response.json();
   } catch (error) {

@@ -5,9 +5,9 @@ import { Generator } from './components/Generator';
 import { SuperAdmin } from './components/SuperAdmin';
 import { Modal, Button } from './components/UIComponents';
 import { generateEvent, updateEvent, generateWebsiteCode } from './services/aiService';
-import { saveEvent, getEvents, deleteEvent } from './services/storageService';
+import { saveEvent, getEvents, deleteEvent, checkServerHealth } from './services/storageService';
 import { EventPlan, AppState, IntegrationConfig } from './types';
-import { AlertCircle, Lock } from 'lucide-react';
+import { AlertCircle, Lock, RefreshCw, Power } from 'lucide-react';
 
 const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [savedEvents, setSavedEvents] = useState<EventPlan[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isServerOffline, setIsServerOffline] = useState(false);
 
   const [isGeneratingWebsite, setIsGeneratingWebsite] = useState(false);
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
@@ -24,20 +25,44 @@ const App: React.FC = () => {
     type: 'zoom',
   });
 
+  const loadEvents = async () => {
+    try {
+      const events = await getEvents();
+      events.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setSavedEvents(events);
+      setIsServerOffline(false);
+    } catch (e) {
+      console.error("Failed to load events", e);
+      setIsServerOffline(true);
+    }
+  };
+
   // Load events when in IDLE state (Generator view)
   useEffect(() => {
     if (appState === AppState.IDLE) {
-      (async () => {
-        try {
-          const events = await getEvents();
-          events.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-          setSavedEvents(events);
-        } catch (e) {
-          console.error("Failed to load events", e);
-        }
-      })();
+      loadEvents();
     }
   }, [appState]);
+
+  // Polling mechanism to auto-connect when server comes online
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (isServerOffline) {
+      // Check immediately
+      checkServerHealth().then(isHealthy => {
+        if (isHealthy) loadEvents();
+      });
+
+      // Then poll every 2 seconds
+      interval = setInterval(async () => {
+        const isHealthy = await checkServerHealth();
+        if (isHealthy) {
+          loadEvents();
+        }
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [isServerOffline]);
 
   const handleGenerate = async (prompt: string) => {
     setAppState(AppState.GENERATING);
@@ -73,9 +98,7 @@ const App: React.FC = () => {
   const confirmDelete = async () => {
     if (deleteConfirmationId) {
       await deleteEvent(deleteConfirmationId);
-      const events = await getEvents();
-      events.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      setSavedEvents(events);
+      await loadEvents(); // Reload list
       setDeleteConfirmationId(null);
     }
   };
@@ -155,6 +178,25 @@ const App: React.FC = () => {
     <>
       <ErrorBanner />
 
+      {isServerOffline && (
+        <div className="bg-slate-900 text-white px-4 py-3 text-center flex flex-col md:flex-row items-center justify-center gap-4 shadow-md relative z-50 border-b border-slate-800 transition-all duration-500">
+          <div className="flex items-center gap-3">
+             <div className="relative">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-red-500 rounded-full absolute top-0 left-0 animate-ping"></div>
+             </div>
+             <p className="font-medium text-sm">Server Disconnected</p>
+          </div>
+          <p className="text-xs text-slate-400 hidden md:block">Waiting for backend connection...</p>
+          <button 
+            onClick={loadEvents} 
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all shadow-lg hover:shadow-indigo-500/25 active:scale-95"
+          >
+            <Power className="w-3 h-3" /> Connect to Server
+          </button>
+        </div>
+      )}
+
       {appState === AppState.ADMIN ? (
         <SuperAdmin
           onLogout={() => setAppState(AppState.IDLE)}
@@ -181,6 +223,7 @@ const App: React.FC = () => {
             savedEvents={savedEvents}
             onSelectEvent={handleSelectEvent}
             onDeleteEvent={handleDeleteEvent}
+            isOffline={isServerOffline}
           />
           {/* Admin Toggle - Bottom Right */}
           <div className="fixed bottom-4 right-4 z-50">
