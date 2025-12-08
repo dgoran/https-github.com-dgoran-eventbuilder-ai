@@ -180,7 +180,6 @@ app.post('/api/admin/config', async (req, res) => {
     if (smtpFrom !== undefined) db.smtpFrom = smtpFrom;
 
     // Encrypt sensitive fields if changed
-    // NOTE: BigMarker API Key stored as plain text for debugging/temporary usage
     if (bigMarkerApiKey && bigMarkerApiKey !== '********') {
       db.bigMarkerApiKey = bigMarkerApiKey.trim();
     }
@@ -362,31 +361,22 @@ app.post('/api/events/:id/registrants', async (req, res) => {
 app.all('/api/bigmarker/*', async (req, res) => {
   try {
     const db = await getDb();
-    // Retrieve plain text key for BigMarker
     const dbKey = db.bigMarkerApiKey; 
-    // Fallback to environment variable for debugging
     const envKey = process.env.BIGMARKER_API_KEY;
     
     let requestKey = req.headers['api-key'] || dbKey || envKey;
     if (requestKey) requestKey = requestKey.trim();
 
     if (!requestKey) {
-      console.error("[BigMarker Proxy] Missing API Key");
       return res.status(401).json({ error: 'Missing API Key' });
     }
 
-    // Construct target URL robustly
     const originalUrl = req.originalUrl || req.url;
     let proxyPath = originalUrl.replace(/^\/api\/bigmarker/i, '');
-    
-    // Ensure leading slash and no double slashes
     if (!proxyPath.startsWith('/')) proxyPath = '/' + proxyPath;
-    proxyPath = proxyPath.replace(/^\/+/, '/'); // normalize // to /
+    proxyPath = proxyPath.replace(/^\/+/, '/');
 
     const targetUrl = `https://www.bigmarker.com${proxyPath}`;
-    console.log(`[BigMarker Proxy] ${req.method} -> ${targetUrl}`);
-
-    // For GET/HEAD, data should be undefined to avoid axios sending empty body {}
     const data = (req.method === 'GET' || req.method === 'HEAD') ? undefined : req.body;
     
     const headers = { 
@@ -395,7 +385,6 @@ app.all('/api/bigmarker/*', async (req, res) => {
       'User-Agent': 'EventBuilder-AI-Proxy/1.0'
     };
 
-    // Only add Content-Type if we are sending data
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       headers['Content-Type'] = 'application/json';
     }
@@ -405,30 +394,21 @@ app.all('/api/bigmarker/*', async (req, res) => {
       url: targetUrl,
       headers: headers,
       data: data,
-      validateStatus: () => true // Allow any status code to pass through
+      validateStatus: () => true 
     });
 
-    console.log(`[BigMarker Proxy] Response status: ${response.status}`);
-
-    // Check content type to decide how to return the response
     const contentType = response.headers['content-type'] || '';
-    
     if (contentType.includes('application/json') && typeof response.data === 'object') {
       return res.status(response.status).json(response.data);
     } else {
-      // If the API returns HTML (often for 404s or 500s on BigMarker), return it as text or wrapped in JSON error
-      // We wrap it in JSON so our frontend can parse the error message cleanly
       const rawBody = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-      // Truncate if too long
       const safeBody = rawBody.length > 500 ? rawBody.substring(0, 500) + '...' : rawBody;
-      
       return res.status(response.status).json({
         error: `BigMarker API Error (${response.status})`,
         details: safeBody
       });
     }
   } catch (e) {
-    console.error('[BigMarker Proxy] Exception:', e.message);
     res.status(500).json({ error: 'Proxy Error: ' + e.message });
   }
 });
@@ -454,15 +434,32 @@ app.all('/api/zoom/*', async (req, res) => {
   }
 });
 
-// Handle React routing, return all requests to React app
-// This must be the LAST route
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// Handle React routing
+// IMPORTANT: Inject API keys into the frontend at runtime
+app.get('*', async (req, res) => {
+  try {
+    const db = await getDb();
+    // Use Cloud Run env var if available, otherwise fallback to DB key (for local dev/admin override)
+    // Note: We decrypt the DB key if it exists.
+    const apiKey = process.env.GEMINI_API_KEY || (db.geminiApiKey ? decrypt(db.geminiApiKey) : '');
+    
+    const indexFile = path.join(__dirname, 'dist', 'index.html');
+    let html = await fs.readFile(indexFile, 'utf8');
+    
+    // Inject the key into the window object so the React app can read it
+    // This allows the app built in Docker (where the key wasn't present) to work at runtime.
+    const injection = `<script>window.GEMINI_API_KEY = "${apiKey}";</script>`;
+    
+    // Insert before </head>
+    html = html.replace('</head>', `${injection}</head>`);
+    
+    res.send(html);
+  } catch(e) {
+    console.error("Error serving index.html:", e);
+    res.status(500).send("Error loading application");
+  }
 });
 
 app.listen(PORT, () => {
   console.log(`\n🚀 Server running at http://localhost:${PORT}`);
-  console.log(`   - API Proxy: /api/bigmarker -> https://www.bigmarker.com`);
-  console.log(`   - Health Check: /api/health`);
-  console.log(`   - Serving Frontend: ${path.join(__dirname, 'dist')}\n`);
 });

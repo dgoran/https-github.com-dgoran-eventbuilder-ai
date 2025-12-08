@@ -2,8 +2,21 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { EventPlan, IntegrationConfig } from "../types";
 
-// Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Dynamic API Key Retrieval
+// Checks for runtime injection (window.GEMINI_API_KEY from server.js) first, then build-time env var.
+const getAiClient = () => {
+  let key = '';
+  if (typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) {
+    key = (window as any).GEMINI_API_KEY;
+  }
+  
+  if (!key) {
+    key = process.env.GEMINI_API_KEY || '';
+  }
+
+  // Fallback or empty init - requests will fail if key is missing, which is handled in catch blocks
+  return new GoogleGenAI({ apiKey: key });
+};
 
 const eventSchema: Schema = {
   type: Type.OBJECT,
@@ -89,6 +102,7 @@ const generateId = () => {
 
 export const generateEvent = async (userPrompt: string): Promise<EventPlan> => {
   try {
+    const ai = getAiClient();
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash-exp",
       contents: `Generate a detailed professional LIVE STREAM WEBINAR event plan based on this request: "${userPrompt}". 
@@ -126,6 +140,7 @@ export const generateEvent = async (userPrompt: string): Promise<EventPlan> => {
 
 export const updateEvent = async (currentPlan: EventPlan, instruction: string): Promise<EventPlan> => {
   try {
+    const ai = getAiClient();
     // Exclude fields that shouldn't be touched by the AI directly in the prompt context to avoid confusion, 
     // though we handle preservation below.
     const { websiteHtml, headerImageUrl, ...planWithoutHeavyFields } = currentPlan;
@@ -178,6 +193,7 @@ export const updateEvent = async (currentPlan: EventPlan, instruction: string): 
 
 export const generateWebsiteCode = async (eventPlan: EventPlan, integration: IntegrationConfig): Promise<string> => {
   try {
+    const ai = getAiClient();
     let integrationInstructions = "";
 
     // The ID injection allows the site to communicate back to the specific event bucket in the backend
