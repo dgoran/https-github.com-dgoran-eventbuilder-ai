@@ -46,6 +46,15 @@ export interface Registrant {
   customData?: Record<string, string>; // To store extra fields from BigMarker forms
 }
 
+export interface EventFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  uploadedAt: number;
+}
+
 export interface EventPlan {
   id: string;
   createdAt: number;
@@ -57,12 +66,13 @@ export interface EventPlan {
   date: string;
   location: string;
   imageKeyword: string;
-  headerImageUrl?: string; // Base64 string for custom header
-  coverImage?: string; // Alias for headerImageUrl
+  headerImageUrl?: string;
+  coverImage?: string;
   speakers: Speaker[];
   agenda: AgendaItem[];
   tasks: Task[];
   budget: EventBudget;
+  files?: EventFile[];
   marketingTagline: string;
   websiteHtml?: string;
   integrationConfig?: IntegrationConfig;
@@ -79,7 +89,7 @@ export interface FormField {
 }
 
 export interface IntegrationConfig {
-  type: 'zoom' | 'bigmarker' | 'email' | 'none';
+  type: 'zoom' | 'bigmarker' | 'email' | 'none' | 'vimeo' | 'custom';
   platformId?: string;
   customFields?: FormField[]; // Fields synced from the platform
   // Compatibility fields for preview components
@@ -112,7 +122,39 @@ export enum AppState {
   GENERATING = 'GENERATING',
   VIEWING = 'VIEWING',
   ADMIN = 'ADMIN',
-  ERROR = 'ERROR'
+  ERROR = 'ERROR',
+  LANDING = 'LANDING',
+  AUTH = 'AUTH',
+  ONBOARDING = 'ONBOARDING'
+}
+
+export interface User {
+  email: string;
+  name?: string;
+  orgName?: string;
+  isAuthenticated: boolean;
+  token?: string;
+}
+
+export interface WizardData {
+  // Step 1: Basics
+  title: string;
+  description: string;
+  attendees: number;
+  presenters: number;
+
+  // Step 2: Content
+  agendaText?: string;
+  agendaFile?: string; // Base64 or Text content
+  agendaFileName?: string;
+  deckFile?: string; // Base64 or URL
+  deckName?: string;
+
+  // Step 3: Logistics
+  eventType: 'virtual' | 'hybrid' | 'in-person';
+  platformType: 'zoom' | 'bigmarker' | 'vimeo' | 'custom' | 'none';
+  customPlatformName?: string;
+  requiresRegistration: boolean;
 }
 
 export interface AIContentResponse {

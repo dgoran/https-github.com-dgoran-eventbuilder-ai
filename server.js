@@ -1,9 +1,11 @@
 
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import path from 'path';
-import { promises as fs } from 'fs';
+import multer from 'multer';
+import fs from 'fs';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { fileURLToPath } from 'url';
@@ -68,17 +70,18 @@ function decrypt(text) {
 
 function createDefaultDb() {
   return {
-    bigMarkerApiKey: '',
-    zoomApiKey: '',
-    vimeoApiKey: '',
-    geminiApiKey: '',
-    defaultProxyUrl: '',
-    smtpHost: '',
-    smtpPort: '',
-    smtpUser: '',
-    smtpPass: '',
-    smtpFrom: '',
-    events: []
+    bigMarkerApiKey: process.env.BIGMARKER_API_KEY || '',
+    zoomApiKey: process.env.ZOOM_API_KEY ? encrypt(process.env.ZOOM_API_KEY) : '',
+    vimeoApiKey: process.env.VIMEO_API_KEY ? encrypt(process.env.VIMEO_API_KEY) : '',
+    geminiApiKey: process.env.GEMINI_API_KEY ? encrypt(process.env.GEMINI_API_KEY) : '',
+    defaultProxyUrl: process.env.DEFAULT_PROXY_URL || '',
+    smtpHost: process.env.SMTP_HOST || '',
+    smtpPort: process.env.SMTP_PORT || '',
+    smtpUser: process.env.SMTP_USER || '',
+    smtpPass: process.env.SMTP_PASS ? encrypt(process.env.SMTP_PASS) : '',
+    smtpFrom: process.env.SMTP_FROM || '',
+    events: [],
+    users: []
   };
 }
 
@@ -90,8 +93,8 @@ async function getDb() {
   try {
     // Try to read from disk
     try {
-      await fs.access(DB_PATH);
-      const data = await fs.readFile(DB_PATH, 'utf8');
+      await fs.promises.access(DB_PATH);
+      const data = await fs.promises.readFile(DB_PATH, 'utf8');
       if (!data || data.trim() === '') {
         dbCache = createDefaultDb();
       } else {
@@ -108,7 +111,7 @@ async function getDb() {
       console.log("Database file not found or inaccessible. Creating new default DB in memory.");
       dbCache = createDefaultDb();
       // Try to save the new default to disk, but don't block if it fails (read-only fs)
-      await saveDb(dbCache).catch(() => {}); 
+      await saveDb(dbCache).catch(() => { });
     }
     return dbCache;
   } catch (e) {
@@ -120,10 +123,10 @@ async function getDb() {
 async function saveDb(data) {
   // Update cache immediately (Source of truth for the session)
   dbCache = data;
-  
+
   try {
     // Attempt to persist to disk
-    await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2));
+    await fs.promises.writeFile(DB_PATH, JSON.stringify(data, null, 2));
   } catch (e) {
     // In Cloud Run or read-only environments, this will fail. 
     // We log it but don't throw, allowing the app to run with in-memory persistence for the session.
@@ -183,7 +186,7 @@ app.post('/api/admin/config', async (req, res) => {
     if (bigMarkerApiKey && bigMarkerApiKey !== '********') {
       db.bigMarkerApiKey = bigMarkerApiKey.trim();
     }
-    
+
     if (zoomApiKey && zoomApiKey !== '********') db.zoomApiKey = encrypt(zoomApiKey);
     if (vimeoApiKey && vimeoApiKey !== '********') db.vimeoApiKey = encrypt(vimeoApiKey);
     if (geminiApiKey && geminiApiKey !== '********') db.geminiApiKey = encrypt(geminiApiKey);
@@ -221,10 +224,333 @@ app.post('/api/admin/test-email', async (req, res) => {
       text: "This is a test email from WebinarHost.",
     });
 
+    // ... existing test-email endpoint ...
     res.json({ success: true });
   } catch (error) {
     console.error("Test email error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// --- AUTH ROUTES ---
+import session from 'express-session';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
+import { Strategy as LinkedInStrategy } from 'passport-linkedin-oauth2';
+
+// Session Configuration (for Passport state, though we are stateless via Magic Link flow logic)
+app.use(session({
+  secret: process.env.ENCRYPTION_KEY || 'keyboard cat',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production' }
+}));
+
+app.use(passport.initialize());
+app.use(passport.session()); // Persistent login sessions (optional if we just redirect to token)
+
+// Passport Serialization
+passport.serializeUser((user, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
+
+// Google Strategy
+// Only initialize if keys are present to avoid startup crashes
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: "/api/auth/google/callback"
+  },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const db = await getDb();
+        if (!db.users) db.users = [];
+
+        const email = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
+        if (!email) return done(new Error("No email found in Google profile"));
+
+        // Find or create user
+        let userIndex = db.users.findIndex(u => u.email === email);
+
+        // Generate a fresh token for this "login"
+        const token = crypto.randomBytes(32).toString('hex');
+        const expires = Date.now() + 3600000; // 1 hour
+
+        if (userIndex === -1) {
+          // Create new user
+          db.users.push({
+            email,
+            name: profile.displayName,
+            googleId: profile.id,
+            token,
+            tokenExpires: expires,
+            isAuthenticated: true, // They authenticated with Google
+            avatar: profile.photos && profile.photos[0] ? profile.photos[0].value : null
+          });
+        } else {
+          // Update existing user
+          db.users[userIndex].token = token;
+          db.users[userIndex].tokenExpires = expires;
+          db.users[userIndex].isAuthenticated = true; // Refresh status
+          db.users[userIndex].googleId = profile.id;
+          if (!db.users[userIndex].avatar && profile.photos && profile.photos[0]) {
+            db.users[userIndex].avatar = profile.photos[0].value;
+          }
+        }
+
+        await saveDb(db);
+
+        // Return user with the token so we can redirect
+        const user = userIndex === -1 ? db.users[db.users.length - 1] : db.users[userIndex];
+        return done(null, user);
+
+      } catch (err) {
+        return done(err);
+      }
+    }
+  ));
+}
+
+// Microsoft Strategy
+if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET) {
+  passport.use(new MicrosoftStrategy({
+    clientID: process.env.MICROSOFT_CLIENT_ID,
+    clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+    callbackURL: "/api/auth/microsoft/callback",
+    scope: ['user.read']
+  },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const db = await getDb();
+        if (!db.users) db.users = [];
+
+        const email = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
+        if (!email) return done(new Error("No email found in Microsoft profile"));
+
+        let userIndex = db.users.findIndex(u => u.email === email);
+        const token = crypto.randomBytes(32).toString('hex');
+        const expires = Date.now() + 3600000;
+
+        if (userIndex === -1) {
+          db.users.push({
+            email,
+            name: profile.displayName,
+            microsoftId: profile.id,
+            token,
+            tokenExpires: expires,
+            isAuthenticated: true,
+            avatar: null
+          });
+        } else {
+          db.users[userIndex].token = token;
+          db.users[userIndex].tokenExpires = expires;
+          db.users[userIndex].isAuthenticated = true;
+          db.users[userIndex].microsoftId = profile.id;
+        }
+        await saveDb(db);
+        const user = userIndex === -1 ? db.users[db.users.length - 1] : db.users[userIndex];
+        return done(null, user);
+      } catch (err) {
+        return done(err);
+      }
+    }
+  ));
+}
+
+// LinkedIn Strategy
+if (process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET) {
+  passport.use(new LinkedInStrategy({
+    clientID: process.env.LINKEDIN_CLIENT_ID,
+    clientSecret: process.env.LINKEDIN_CLIENT_SECRET,
+    callbackURL: "/api/auth/linkedin/callback",
+    scope: ['r_emailaddress', 'r_liteprofile']
+  },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const db = await getDb();
+        if (!db.users) db.users = [];
+
+        const email = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
+        if (!email) return done(new Error("No email found in LinkedIn profile"));
+
+        let userIndex = db.users.findIndex(u => u.email === email);
+        const token = crypto.randomBytes(32).toString('hex');
+        const expires = Date.now() + 3600000;
+
+        if (userIndex === -1) {
+          db.users.push({
+            email,
+            name: profile.displayName,
+            linkedinId: profile.id,
+            token,
+            tokenExpires: expires,
+            isAuthenticated: true,
+            avatar: profile.photos && profile.photos[0] ? profile.photos[0].value : null
+          });
+        } else {
+          db.users[userIndex].token = token;
+          db.users[userIndex].tokenExpires = expires;
+          db.users[userIndex].isAuthenticated = true;
+          db.users[userIndex].linkedinId = profile.id;
+          if (!db.users[userIndex].avatar && profile.photos && profile.photos[0]) {
+            db.users[userIndex].avatar = profile.photos[0].value;
+          }
+        }
+        await saveDb(db);
+        const user = userIndex === -1 ? db.users[db.users.length - 1] : db.users[userIndex];
+        return done(null, user);
+      } catch (err) {
+        return done(err);
+      }
+    }
+  ));
+}
+
+// Google Auth Handlers
+app.get('/api/auth/google', (req, res, next) => {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(500).send("Google Auth not configured on server.");
+  }
+  passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+});
+
+app.get('/api/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/' }),
+  (req, res) => {
+    // Successful authentication
+    const user = req.user;
+    // Redirect to home with token param, reusing the magic link logic
+    res.redirect(`/?token=${user.token}`);
+  }
+);
+
+// Auth Handlers (Microsoft)
+app.get('/api/auth/microsoft', (req, res, next) => {
+  if (!process.env.MICROSOFT_CLIENT_ID) return res.status(500).send("Microsoft Auth not configured.");
+  passport.authenticate('microsoft', { prompt: 'select_account' })(req, res, next);
+});
+
+app.get('/api/auth/microsoft/callback',
+  passport.authenticate('microsoft', { failureRedirect: '/' }),
+  (req, res) => res.redirect(`/?token=${req.user.token}`)
+);
+
+// Auth Handlers (LinkedIn)
+app.get('/api/auth/linkedin', (req, res, next) => {
+  if (!process.env.LINKEDIN_CLIENT_ID) return res.status(500).send("LinkedIn Auth not configured.");
+  passport.authenticate('linkedin')(req, res, next);
+});
+
+app.get('/api/auth/linkedin/callback',
+  passport.authenticate('linkedin', { failureRedirect: '/' }),
+  (req, res) => res.redirect(`/?token=${req.user.token}`)
+);
+
+
+app.post('/api/auth/magic-link', async (req, res) => {
+  try {
+    const { email, firstName, lastName, orgName } = req.body;
+    const db = await getDb();
+
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expires = Date.now() + 3600000; // 1 hour
+
+    // Save user/token to DB (simplistic auth store)
+    if (!db.users) db.users = [];
+
+    // Remove existing pending tokens for this email
+    db.users = db.users.filter(u => u.email !== email);
+
+    db.users.push({
+      email,
+      name: `${firstName || ''} ${lastName || ''}`.trim(),
+      orgName,
+      token,
+      tokenExpires: expires,
+      isAuthenticated: false
+    });
+
+    await saveDb(db);
+
+    const link = `http://localhost:${PORT}/verify?token=${token}`;
+
+    console.log(`[MAGIC LINK] ${link} (For: ${email})`);
+
+    // Send Email if SMTP configured
+    if (db.smtpHost && db.smtpUser && db.smtpPass) {
+      const smtpPass = decrypt(db.smtpPass);
+      const transporter = nodemailer.createTransport({
+        host: db.smtpHost,
+        port: parseInt(db.smtpPort || '587'),
+        secure: parseInt(db.smtpPort) === 465,
+        auth: { user: db.smtpUser, pass: smtpPass },
+      });
+
+      await transporter.sendMail({
+        from: db.smtpFrom || `"${db.smtpUser}" <${db.smtpUser}>`,
+        to: email,
+        subject: "Your EventBuilder Login Link",
+        html: `
+            <div style="font-family: sans-serif; padding: 20px;">
+               <h2>Welcome to EventBuilder!</h2>
+               <p>Click the link below to sign in:</p>
+               <a href="${link}" style="display:inline-block; padding: 12px 24px; background: #4f46e5; color: white; text-decoration: none; border-radius: 8px;">Sign In to EventBuilder</a>
+               <p style="margin-top:20px; color: #666; font-size: 12px;">Link expires in 1 hour.</p>
+            </div>
+          `
+      });
+    }
+
+    res.json({ success: true, message: 'Magic link sent' });
+
+  } catch (e) {
+    console.error("Auth error:", e);
+    res.status(500).json({ error: "Failed to send magic link" });
+  }
+});
+
+app.post('/api/auth/verify', async (req, res) => {
+  try {
+    const { token } = req.body;
+    const db = await getDb();
+
+    if (!db.users) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    const userIndex = db.users.findIndex(u => u.token === token && u.tokenExpires > Date.now());
+
+    if (userIndex === -1) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+
+    // Mark authenticated and clear token so it can't be reused immediately (optional, or keep for session)
+    // For this simple JWT-less flow, we just return success and client sets state.
+    const user = db.users[userIndex];
+    user.isAuthenticated = true;
+    user.token = null; // Consume token
+
+    await saveDb(db);
+
+    res.json({
+      success: true,
+      user: {
+        email: user.email,
+        name: user.name,
+        orgName: user.orgName,
+        isAuthenticated: true
+      }
+    });
+
+  } catch (e) {
+    res.status(500).json({ error: "Verification failed" });
   }
 });
 
@@ -303,7 +629,7 @@ app.put('/api/events/:id', async (req, res) => {
     const updatedEvent = req.body;
     const db = await getDb();
     const index = (db.events || []).findIndex(e => e.id === id);
-    
+
     if (index !== -1) {
       db.events[index] = updatedEvent;
       await saveDb(db);
@@ -329,22 +655,118 @@ app.delete('/api/events/:id', async (req, res) => {
   }
 });
 
+// --- FILE UPLOAD ROUTES ---
+// --- FILE UPLOAD ROUTES ---
+
+// Ensure uploads directory exists
+const UPLOADS_DIR = path.join(__dirname, 'uploads');
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    console.log(`Created uploads directory at: ${UPLOADS_DIR}`);
+  } else {
+    console.log(`Uploads directory exists at: ${UPLOADS_DIR}`);
+  }
+} catch (err) {
+  console.error("Failed to create uploads dir:", err);
+}
+
+// Serve uploads statically
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: function (req, file, cb) {
+    // Sanitize filename and append unique ID
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const sanitized = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+    cb(null, uniqueSuffix + '-' + sanitized);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+app.post('/api/events/:id/files', upload.single('file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const db = await getDb();
+    const eventIndex = (db.events || []).findIndex(e => e.id === id);
+
+    if (eventIndex === -1) {
+      // Clean up orphaned file
+      fs.promises.unlink(req.file.path).catch(() => { });
+      return res.status(404).json({ error: "Event not found" });
+    }
+
+    const newFile = {
+      id: Date.now().toString(),
+      name: req.file.originalname,
+      type: req.file.mimetype,
+      size: req.file.size,
+      url: `/uploads/${req.file.filename}`,
+      uploadedAt: Date.now()
+    };
+
+    if (!db.events[eventIndex].files) db.events[eventIndex].files = [];
+    db.events[eventIndex].files.push(newFile);
+    await saveDb(db);
+
+    res.json(newFile);
+  } catch (e) {
+    console.error("Upload error:", e);
+    res.status(500).json({ error: "Failed to upload file" });
+  }
+});
+
+app.delete('/api/events/:id/files/:fileId', async (req, res) => {
+  try {
+    const { id, fileId } = req.params;
+    const db = await getDb();
+    const eventIndex = (db.events || []).findIndex(e => e.id === id);
+
+    if (eventIndex !== -1 && db.events[eventIndex].files) {
+      const fileIndex = db.events[eventIndex].files.findIndex(f => f.id === fileId);
+      if (fileIndex !== -1) {
+        const file = db.events[eventIndex].files[fileIndex];
+        // Try to delete from disk
+        const filePath = path.join(__dirname, 'uploads', path.basename(file.url));
+        fs.promises.unlink(filePath).catch(err => console.warn("Failed to delete local file:", err));
+
+        // Remove from DB
+        db.events[eventIndex].files.splice(fileIndex, 1);
+        await saveDb(db);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to delete file" });
+  }
+});
+
 app.post('/api/events/:id/registrants', async (req, res) => {
   try {
     const { id } = req.params;
     const registrant = req.body; // { id, name, email, ... }
     const db = await getDb();
     const index = (db.events || []).findIndex(e => e.id === id);
-    
+
     if (index !== -1) {
       if (!db.events[index].registrants) db.events[index].registrants = [];
-      
+
       // Prevent duplicates based on email
       if (!db.events[index].registrants.some(r => r.email === registrant.email)) {
         // Generate ID if missing
         if (!registrant.id) registrant.id = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
         if (!registrant.registeredAt) registrant.registeredAt = Date.now();
-        
+
         db.events[index].registrants.push(registrant);
         await saveDb(db);
       }
@@ -361,9 +783,9 @@ app.post('/api/events/:id/registrants', async (req, res) => {
 app.all('/api/bigmarker/*', async (req, res) => {
   try {
     const db = await getDb();
-    const dbKey = db.bigMarkerApiKey; 
+    const dbKey = db.bigMarkerApiKey;
     const envKey = process.env.BIGMARKER_API_KEY;
-    
+
     let requestKey = req.headers['api-key'] || dbKey || envKey;
     if (requestKey) requestKey = requestKey.trim();
 
@@ -378,8 +800,8 @@ app.all('/api/bigmarker/*', async (req, res) => {
 
     const targetUrl = `https://www.bigmarker.com${proxyPath}`;
     const data = (req.method === 'GET' || req.method === 'HEAD') ? undefined : req.body;
-    
-    const headers = { 
+
+    const headers = {
       'API-KEY': requestKey,
       'Accept': 'application/json',
       'User-Agent': 'EventBuilder-AI-Proxy/1.0'
@@ -394,7 +816,7 @@ app.all('/api/bigmarker/*', async (req, res) => {
       url: targetUrl,
       headers: headers,
       data: data,
-      validateStatus: () => true 
+      validateStatus: () => true
     });
 
     const contentType = response.headers['content-type'] || '';
@@ -442,19 +864,19 @@ app.get('*', async (req, res) => {
     // Use Cloud Run env var if available, otherwise fallback to DB key (for local dev/admin override)
     // Note: We decrypt the DB key if it exists.
     const apiKey = process.env.GEMINI_API_KEY || (db.geminiApiKey ? decrypt(db.geminiApiKey) : '');
-    
+
     const indexFile = path.join(__dirname, 'dist', 'index.html');
-    let html = await fs.readFile(indexFile, 'utf8');
-    
+    let html = await fs.promises.readFile(indexFile, 'utf8');
+
     // Inject the key into the window object so the React app can read it
     // This allows the app built in Docker (where the key wasn't present) to work at runtime.
     const injection = `<script>window.GEMINI_API_KEY = "${apiKey}";</script>`;
-    
+
     // Insert before </head>
     html = html.replace('</head>', `${injection}</head>`);
-    
+
     res.send(html);
-  } catch(e) {
+  } catch (e) {
     console.error("Error serving index.html:", e);
     res.status(500).send("Error loading application");
   }

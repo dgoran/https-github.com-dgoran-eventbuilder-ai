@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { Generator } from './components/Generator';
 import { SuperAdmin } from './components/SuperAdmin';
+import { LandingPage } from './components/LandingPage';
+import { AuthFlow } from './components/Auth/AuthFlow';
+import { EventWizard } from './components/Wizard/EventWizard';
 import { Modal, Button } from './components/UIComponents';
 import { generateEvent, updateEvent, generateWebsiteCode } from './services/aiService';
 import { saveEvent, getEvents, deleteEvent, checkServerHealth } from './services/storageService';
@@ -10,7 +13,7 @@ import { EventPlan, AppState, IntegrationConfig } from './types';
 import { AlertCircle, Lock, RefreshCw, Power } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [appState, setAppState] = useState<AppState>(AppState.IDLE);
+  const [appState, setAppState] = useState<AppState>(AppState.LANDING);
   const [eventPlan, setEventPlan] = useState<EventPlan | null>(null);
   const [savedEvents, setSavedEvents] = useState<EventPlan[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -64,11 +67,57 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [isServerOffline]);
 
-  const handleGenerate = async (prompt: string) => {
+  // Magic Link Verification Handler
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    if (token) {
+      verifyToken(token);
+    }
+  }, []);
+
+  const verifyToken = async (token: string) => {
+    // Clear URL to prevent re-triggering on refresh
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    try {
+      setAppState(AppState.AUTH); // Show auth screen (or loading state) briefly? 
+      // Actually, better to show a loading overlay or just jump to onboarding
+
+      const res = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        console.log("Verified via Magic Link:", data.user);
+        setAppState(AppState.ONBOARDING);
+      } else {
+        setError("Invalid or expired login link.");
+        setAppState(AppState.LANDING);
+      }
+    } catch (e) {
+      console.error(e);
+      setError("Verification failed.");
+      setAppState(AppState.LANDING);
+    }
+  };
+
+  const handleGenerate = async (prompt: string, initialConfig?: IntegrationConfig) => {
     setAppState(AppState.GENERATING);
     setError(null);
     try {
       const plan = await generateEvent(prompt);
+
+      // Merge initial configuration from wizard if present
+      if (initialConfig) {
+        plan.integrationConfig = initialConfig;
+        setIntegrationConfig(initialConfig);
+      }
+
       setEventPlan(plan);
       await saveEvent(plan); // Persist immediately
       setAppState(AppState.VIEWING);
@@ -181,20 +230,67 @@ const App: React.FC = () => {
       {isServerOffline && (
         <div className="bg-slate-900 text-white px-4 py-3 text-center flex flex-col md:flex-row items-center justify-center gap-4 shadow-md relative z-50 border-b border-slate-800 transition-all duration-500">
           <div className="flex items-center gap-3">
-             <div className="relative">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <div className="w-3 h-3 bg-red-500 rounded-full absolute top-0 left-0 animate-ping"></div>
-             </div>
-             <p className="font-medium text-sm">Server Disconnected</p>
+            <div className="relative">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+              <div className="w-3 h-3 bg-red-500 rounded-full absolute top-0 left-0 animate-ping"></div>
+            </div>
+            <p className="font-medium text-sm">Server Disconnected</p>
           </div>
           <p className="text-xs text-slate-400 hidden md:block">Waiting for backend connection...</p>
-          <button 
-            onClick={loadEvents} 
+          <button
+            onClick={loadEvents}
             className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all shadow-lg hover:shadow-indigo-500/25 active:scale-95"
           >
             <Power className="w-3 h-3" /> Connect to Server
           </button>
         </div>
+      )}
+
+
+      {appState === AppState.LANDING && (
+        <LandingPage
+          onGetStarted={() => setAppState(AppState.AUTH)}
+          onLogin={() => setAppState(AppState.AUTH)}
+        />
+      )}
+
+      {appState === AppState.AUTH && (
+        <AuthFlow
+          onComplete={(user) => {
+            console.log("Logged in:", user);
+            setAppState(AppState.ONBOARDING);
+          }}
+          onCancel={() => setAppState(AppState.LANDING)}
+        />
+      )}
+
+      {appState === AppState.ONBOARDING && (
+        <EventWizard
+          onComplete={(data) => {
+            // transform wizard data into a prompt
+            const prompt = `
+                 Title: ${data.title}
+                 Topic/Description: ${data.description}
+                 Attendees: ${data.attendees}
+                 Presenters: ${data.presenters}
+                 Type: ${data.eventType}
+                 Platform: ${data.platformType}
+                 Agenda: ${data.agendaText || 'Please generate a standard agenda'}
+                 Registration Required: ${data.requiresRegistration}
+               `;
+
+            const newConfig: IntegrationConfig = {
+              type: data.platformType as any,
+              platformId: 'mock-id'
+            };
+
+            // Set integration config (for UI state)
+            setIntegrationConfig(newConfig);
+
+            handleGenerate(prompt, newConfig);
+          }}
+          onCancel={() => setAppState(AppState.LANDING)}
+        />
       )}
 
       {appState === AppState.ADMIN ? (
@@ -215,7 +311,7 @@ const App: React.FC = () => {
           setIntegrationConfig={setIntegrationConfig}
           onExit={() => setAppState(AppState.IDLE)}
         />
-      ) : (
+      ) : appState === AppState.IDLE || appState === AppState.GENERATING ? (
         <>
           <Generator
             onGenerate={handleGenerate}
@@ -236,7 +332,7 @@ const App: React.FC = () => {
             </button>
           </div>
         </>
-      )}
+      ) : null}
 
 
       <Modal

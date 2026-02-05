@@ -9,7 +9,7 @@ const getAiClient = () => {
   if (typeof window !== 'undefined' && (window as any).GEMINI_API_KEY) {
     key = (window as any).GEMINI_API_KEY;
   }
-  
+
   if (!key) {
     key = process.env.GEMINI_API_KEY || '';
   }
@@ -100,12 +100,13 @@ const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 };
 
-export const generateEvent = async (userPrompt: string): Promise<EventPlan> => {
+export const generateEvent = async (userPrompt: string, fileData?: { mimeType: string, data: string }): Promise<EventPlan> => {
   try {
     const ai = getAiClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
-      contents: `Generate a detailed professional LIVE STREAM WEBINAR event plan based on this request: "${userPrompt}". 
+
+    // Construct content parts
+    const textPart = {
+      text: `Generate a detailed professional LIVE STREAM WEBINAR event plan based on this request: "${userPrompt}". 
       
       CRITICAL INSTRUCTIONS:
       1. This IS A VIRTUAL EVENT/WEBINAR. The location must reflect that (e.g., Zoom, Bigmarker).
@@ -114,8 +115,25 @@ export const generateEvent = async (userPrompt: string): Promise<EventPlan> => {
       4. Tasks should focus on "tech check", "speaker lighting", "webinar setup", "email sequences".
       5. Budget should focus on "streaming software", "digital ads", "speaker fees" rather than venue catering.
       6. Provide 'imageKeyword' fields that are simple nouns for fetching placeholder images (e.g. use 'laptop' not 'person using laptop').
+      7. IF A FILE IS ATTACHED: Use the content of the attached file as the primary source for the Agenda and Schedule.
       
-      Output strictly JSON.`,
+      Output strictly JSON.`
+    };
+
+    const parts: any[] = [textPart];
+
+    if (fileData) {
+      parts.push({
+        inlineData: {
+          mimeType: fileData.mimeType,
+          data: fileData.data
+        }
+      });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash-001",
+      contents: [{ role: 'user', parts: parts }],
       config: {
         responseMimeType: "application/json",
         responseSchema: eventSchema,
@@ -146,7 +164,7 @@ export const updateEvent = async (currentPlan: EventPlan, instruction: string): 
     const { websiteHtml, headerImageUrl, ...planWithoutHeavyFields } = currentPlan;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash-exp",
+      model: "gemini-2.0-flash-001",
       contents: `Current Webinar Plan JSON: ${JSON.stringify(planWithoutHeavyFields)}. 
       
       User Instruction for modification: "${instruction}".
@@ -286,6 +304,20 @@ export const generateWebsiteCode = async (eventPlan: EventPlan, integration: Int
         Button Text: "Register via Zoom".
         Add the script tag provided below at the end of the body.
       `;
+    } else if (integration.type === 'vimeo') {
+      integrationInstructions = `
+        Create a registration form that simulates a Vimeo Event Registration.
+        Form fields: First Name (name="first_name"), Last Name (name="last_name"), Email (name="email").
+        Button Text: "Register for Vimeo Stream".
+        Add the script tag provided below at the end of the body.
+      `;
+    } else if (integration.type === 'custom') {
+      integrationInstructions = `
+        Create a registration form for a Custom White Label Webinar Platform.
+        Form fields: First Name (name="first_name"), Last Name (name="last_name"), Email (name="email"), Job Title (name="job_title"), Company (name="company").
+        Button Text: "Secure My Spot".
+        Add the script tag provided below at the end of the body.
+      `;
     } else if (integration.type === 'bigmarker') {
       // Fallback for BigMarker if no fields synced
       integrationInstructions = `
@@ -315,7 +347,7 @@ export const generateWebsiteCode = async (eventPlan: EventPlan, integration: Int
     const heroImageSrc = eventPlan.headerImageUrl || `https://picsum.photos/seed/${eventPlan.imageKeyword}/1200/600`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash-001",
       contents: `Design a single-file HTML/Tailwind CSS landing page for this LIVE STREAM WEBINAR.
       
       Event Details:

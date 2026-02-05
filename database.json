@@ -3,11 +3,1631 @@
   "zoomApiKey": "",
   "vimeoApiKey": "",
   "geminiApiKey": "",
-  "defaultProxyUrl": "/api/bigmarker",
+  "defaultProxyUrl": "",
   "smtpHost": "",
   "smtpPort": "",
   "smtpUser": "",
   "smtpPass": "",
   "smtpFrom": "",
-  "events": []
+  "events": [
+    {
+      "title": "Ipsum Nemo Sed Est: Advances in Breast Cancer Treatment",
+      "description": "A virtual webinar focusing on the latest updates in HER2, Triple Negative, and HR+ breast cancer, featuring expert presentations and panel discussions.",
+      "theme": "Advancing Breast Cancer Care Through Innovation",
+      "imageKeyword": "oncology",
+      "speakers": [
+        {
+          "id": "spk1",
+          "name": "Dr. Anya Sharma",
+          "role": "Medical Oncologist, Breast Cancer Specialist",
+          "bio": "Dr. Sharma is a leading medical oncologist specializing in breast cancer treatment and research at the University of California, San Francisco."
+        },
+        {
+          "id": "spk2",
+          "name": "Dr. Kenji Tanaka",
+          "role": "Director of Clinical Research, Oncology",
+          "bio": "Dr. Tanaka directs clinical research at the National Cancer Institute, focusing on novel therapeutic approaches for metastatic breast cancer."
+        },
+        {
+          "id": "spk3",
+          "name": "Dr. Isabella Rossi",
+          "role": "Professor of Oncology, Harvard Medical School",
+          "bio": "Dr. Rossi is a renowned professor of oncology at Harvard Medical School, with expertise in personalized medicine for breast cancer patients."
+        },
+        {
+          "id": "spk4",
+          "name": "Dr. David Chen",
+          "role": "Chief of Medical Oncology, Memorial Sloan Kettering Cancer Center",
+          "bio": "Dr. Chen is the Chief of Medical Oncology at Memorial Sloan Kettering, specializing in HER2-positive breast cancer and innovative targeted therapies."
+        },
+        {
+          "id": "spk5",
+          "name": "Ralph Boccia",
+          "role": "MD, FACP, Center for Cancer and Blood Disorders, AON, CMO ION",
+          "bio": "Dr. Boccia is a leading expert in cancer and blood disorders."
+        },
+        {
+          "id": "spk6",
+          "name": "Claudine Isaacs",
+          "role": "MD, Georgetown University",
+          "bio": "Dr. Isaacs is a renowned expert in HER2 research."
+        },
+        {
+          "id": "spk7",
+          "name": "Filipa Lynce",
+          "role": "MD, Dana-Farber Cancer Institute",
+          "bio": "Dr. Lynce is a leading expert in Triple Negative Breast Cancer."
+        },
+        {
+          "id": "spk8",
+          "name": "Hope Rugo",
+          "role": "MD, City of Hope",
+          "bio": "Dr. Rugo is a renowned expert in HR+ Breast Cancer."
+        },
+        {
+          "id": "spk9",
+          "name": "Amanda Webb",
+          "role": "Director of US Medical Affairs Oncology, Daiichi",
+          "bio": "Amanda Webb is the Director of US Medical Affairs Oncology at Daiichi."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "ag1",
+          "time": "9:00 AM",
+          "title": "Welcome Remarks and Transition to CME",
+          "description": "Introduction by Program Moderator, Ralph Boccia, MD, FACP, Center for Cancer and Blood Disorders, AON, CMO ION.",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "welcome"
+        },
+        {
+          "id": "ag2",
+          "time": "9:05 AM",
+          "title": "Updates in HER2",
+          "description": "Non-Commercial/Non-Sponsored Clinical Presentation by Claudine Isaacs, MD, Georgetown University.",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "dna"
+        },
+        {
+          "id": "ag3",
+          "time": "9:50 AM",
+          "title": "Updates in Triple Negative Breast Cancer",
+          "description": "Non-Commercial/Non-Sponsored Clinical Presentation by Filipa Lynce, MD, Dana-Farber Cancer Institute.",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "cells"
+        },
+        {
+          "id": "ag4",
+          "time": "10:35 AM",
+          "title": "Updates in HR+",
+          "description": "Non-Commercial/Non-Sponsored Clinical Presentation by Hope Rugo, MD, City of Hope.",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "hormones"
+        },
+        {
+          "id": "ag5",
+          "time": "11:20 AM",
+          "title": "Break and Visit Virtual Exhibit Hall",
+          "description": "10-minute break for attendees to visit the virtual exhibit hall and network.",
+          "durationMinutes": 10,
+          "type": "break",
+          "imageKeyword": "coffee"
+        },
+        {
+          "id": "ag6",
+          "time": "11:30 AM",
+          "title": "Clinical Panel Discussion: Challenging Cases",
+          "description": "Non-Commercial/Non-Sponsored Clinical Panel Discussion with Filipa Lynce, MD and Hope Rugo, MD. Interactive Q&A session.",
+          "durationMinutes": 15,
+          "type": "panel",
+          "imageKeyword": "discussion"
+        },
+        {
+          "id": "ag7",
+          "time": "11:45 AM",
+          "title": "Room Transition",
+          "description": "Transition to the next session.",
+          "durationMinutes": 5,
+          "type": "break",
+          "imageKeyword": "clock"
+        },
+        {
+          "id": "ag8",
+          "time": "11:50 AM",
+          "title": "Fam-Trastuzumab Deruxtecan-nxki (T-DXd) for Eligible Patients With Metastatic Breast Cancer",
+          "description": "Presentation by Amanda Webb, Director of US Medical Affairs Oncology, Daiichi.",
+          "durationMinutes": 30,
+          "type": "keynote",
+          "imageKeyword": "medicine"
+        },
+        {
+          "id": "ag9",
+          "time": "12:20 PM",
+          "title": "Closing Remarks and Visit Virtual Exhibit Hall",
+          "description": "Concluding remarks and final opportunity to visit the virtual exhibit hall.",
+          "durationMinutes": 5,
+          "type": "other",
+          "imageKeyword": "farewell"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task1",
+          "title": "Confirm Speaker Availability and Tech Specs",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "task2",
+          "title": "Webinar Platform Setup and Configuration",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "task3",
+          "title": "Design and Distribute Email Sequences for Registration and Reminders",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "task4",
+          "title": "Conduct Speaker Tech Checks and Rehearsals",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "task5",
+          "title": "Create and Test Interactive Polls for Audience Engagement",
+          "status": "pending",
+          "priority": "medium"
+        },
+        {
+          "id": "task6",
+          "title": "Ensure Speaker Lighting and Backgrounds are Professional",
+          "status": "pending",
+          "priority": "medium"
+        },
+        {
+          "id": "task7",
+          "title": "Monitor Webinar During Live Stream for Technical Issues",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "task8",
+          "title": "Prepare Post-Webinar Survey and Feedback Collection",
+          "status": "pending",
+          "priority": "medium"
+        }
+      ],
+      "budget": {
+        "totalBudget": 7500,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 2000,
+            "category": "Software",
+            "label": "Zoom Webinar Platform License"
+          },
+          {
+            "amount": 2500,
+            "category": "Marketing",
+            "label": "Digital Advertising and Promotion"
+          },
+          {
+            "amount": 3000,
+            "category": "Speakers",
+            "label": "Speaker Honorariums"
+          }
+        ]
+      },
+      "marketingTagline": "Stay Informed on Breast Cancer Advances: A Virtual Webinar for Healthcare Professionals",
+      "date": "November 15, 2024",
+      "estimatedAttendees": 14,
+      "location": "Zoom Webinar",
+      "targetAudience": "Oncologists, Medical Professionals, Researchers",
+      "id": "ml9tn730wdmimzn33",
+      "createdAt": 1770318025884,
+      "integrationConfig": {
+        "type": "zoom",
+        "platformId": "mock-id"
+      }
+    },
+    {
+      "title": "Incidunt nostrud vo",
+      "description": "Placeat molestiae t",
+      "theme": "Advancements in Breast Cancer Treatment",
+      "imageKeyword": "oncology",
+      "speakers": [
+        {
+          "id": "speaker1",
+          "name": "Dr. Anya Sharma",
+          "role": "Medical Oncologist",
+          "bio": "Dr. Sharma is a leading expert in targeted therapies for breast cancer."
+        },
+        {
+          "id": "speaker2",
+          "name": "Dr. Kenji Tanaka",
+          "role": "Research Scientist",
+          "bio": "Dr. Tanaka specializes in the molecular mechanisms of cancer drug resistance."
+        },
+        {
+          "id": "speaker3",
+          "name": "Dr. Maria Rodriguez",
+          "role": "Surgical Oncologist",
+          "bio": "Dr. Rodriguez focuses on minimally invasive surgical techniques for breast cancer."
+        },
+        {
+          "id": "speaker4",
+          "name": "Dr. David Lee",
+          "role": "Radiation Oncologist",
+          "bio": "Dr. Lee is an expert in advanced radiation therapy for breast cancer patients."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "agenda1",
+          "time": "9:00 AM",
+          "title": "Welcome Remarks and Transition to CME",
+          "description": "Introduction by Ralph Boccia, MD, FACP, Center for Cancer and Blood Disorders, AON, CMO ION",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "welcome"
+        },
+        {
+          "id": "agenda2",
+          "time": "9:05 AM",
+          "title": "Updates in HER2",
+          "description": "Non-Commercial/Non-Sponsored Clinical Presentation by Claudine Isaacs, MD, Georgetown University",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "her2"
+        },
+        {
+          "id": "agenda3",
+          "time": "9:50 AM",
+          "title": "Updates in Triple Negative Breast Cancer",
+          "description": "Non-Commercial/Non-Sponsored Clinical Presentation by Filipa Lynce, MD, Dana-Farber Cancer Institute",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "tnbc"
+        },
+        {
+          "id": "agenda4",
+          "time": "10:35 AM",
+          "title": "Updates in HR+",
+          "description": "Non-Commercial/Non-Sponsored Clinical Presentation by Hope Rugo, MD, City of Hope",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "hormone"
+        },
+        {
+          "id": "agenda5",
+          "time": "11:20 AM",
+          "title": "Break and Visit Virtual Exhibit Hall",
+          "description": "Take a short break and explore the virtual exhibits.",
+          "durationMinutes": 10,
+          "type": "break",
+          "imageKeyword": "coffee"
+        },
+        {
+          "id": "agenda6",
+          "time": "11:30 AM",
+          "title": "Clinical Panel Discussion",
+          "description": "Non-Commercial/Non-Sponsored Clinical Panel Discussion with Filipa Lynce, MD and Hope Rugo, MD",
+          "durationMinutes": 15,
+          "type": "panel",
+          "imageKeyword": "discussion"
+        },
+        {
+          "id": "agenda7",
+          "time": "11:45 AM",
+          "title": "Room Transition",
+          "description": "Transition to the next presentation.",
+          "durationMinutes": 5,
+          "type": "break",
+          "imageKeyword": "transition"
+        },
+        {
+          "id": "agenda8",
+          "time": "11:50 AM",
+          "title": "Fam-Trastuzumab Deruxtecan-nxki (T-DXd) for Eligible Patients With Metastatic Breast Cancer",
+          "description": "Presentation by Amanda Webb, Director of US Medical Affairs Oncology, Daiichi",
+          "durationMinutes": 30,
+          "type": "keynote",
+          "imageKeyword": "treatment"
+        },
+        {
+          "id": "agenda9",
+          "time": "12:20 PM",
+          "title": "Closing Remarks and Visit Virtual Exhibit Hall",
+          "description": "Concluding the webinar and final visit to virtual exhibit hall.",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "conclusion"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task1",
+          "title": "Platform Tech Check",
+          "status": "completed",
+          "priority": "high"
+        },
+        {
+          "id": "task2",
+          "title": "Speaker Lighting and Audio Test",
+          "status": "completed",
+          "priority": "high"
+        },
+        {
+          "id": "task3",
+          "title": "Webinar Setup on Zoom",
+          "status": "completed",
+          "priority": "high"
+        },
+        {
+          "id": "task4",
+          "title": "Send Registration Confirmation Emails",
+          "status": "completed",
+          "priority": "medium"
+        },
+        {
+          "id": "task5",
+          "title": "Send Reminder Emails",
+          "status": "completed",
+          "priority": "medium"
+        },
+        {
+          "id": "task6",
+          "title": "Prepare Q&A Moderation Plan",
+          "status": "in-progress",
+          "priority": "medium"
+        },
+        {
+          "id": "task7",
+          "title": "Post-Webinar Survey Setup",
+          "status": "pending",
+          "priority": "low"
+        },
+        {
+          "id": "task8",
+          "title": "Create and Schedule Social Media Promotion",
+          "status": "completed",
+          "priority": "medium"
+        },
+        {
+          "id": "task9",
+          "title": "Rehearse Speaker Transitions",
+          "status": "in-progress",
+          "priority": "high"
+        }
+      ],
+      "budget": {
+        "totalBudget": 15000,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 5000,
+            "category": "Software",
+            "label": "Streaming Software (Zoom)"
+          },
+          {
+            "amount": 4000,
+            "category": "Marketing",
+            "label": "Digital Advertising"
+          },
+          {
+            "amount": 6000,
+            "category": "Speakers",
+            "label": "Speaker Honorariums"
+          }
+        ]
+      },
+      "marketingTagline": "Stay Informed on the Latest Breast Cancer Advancements",
+      "date": "November 15, 2024",
+      "estimatedAttendees": 56,
+      "location": "Zoom Webinar",
+      "targetAudience": "Oncologists, Researchers, and Healthcare Professionals",
+      "id": "ml9tbag81ndq7f3zi",
+      "createdAt": 1770317470376,
+      "integrationConfig": {
+        "type": "zoom",
+        "platformId": "mock-id"
+      }
+    },
+    {
+      "title": "Innovations in Breast Cancer Treatment: A Virtual Symposium",
+      "description": "A comprehensive virtual symposium exploring the latest advancements in HER2, Triple Negative, and HR+ breast cancer treatments, featuring expert presentations and interactive panel discussions.",
+      "theme": "Advancing Breast Cancer Care Through Innovation",
+      "imageKeyword": "oncology",
+      "speakers": [
+        {
+          "id": "spk1",
+          "name": "Dr. Ralph Boccia",
+          "role": "Program Moderator, Center for Cancer and Blood Disorders, AON, CMO ION",
+          "bio": "Dr. Boccia is a leading expert in hematology and oncology, with extensive experience in clinical research and patient care."
+        },
+        {
+          "id": "spk2",
+          "name": "Dr. Claudine Isaacs",
+          "role": "Professor of Medicine and Oncology, Georgetown University",
+          "bio": "Dr. Isaacs is a renowned researcher and clinician specializing in breast cancer, with a focus on HER2-positive disease."
+        },
+        {
+          "id": "spk3",
+          "name": "Dr. Filipa Lynce",
+          "role": "Medical Oncologist, Dana-Farber Cancer Institute",
+          "bio": "Dr. Lynce is an expert in triple-negative breast cancer, actively involved in clinical trials and personalized medicine approaches."
+        },
+        {
+          "id": "spk4",
+          "name": "Dr. Hope Rugo",
+          "role": "Professor of Medicine, City of Hope",
+          "bio": "Dr. Rugo is a leading authority on HR+ breast cancer, focusing on novel therapies and endocrine resistance."
+        },
+        {
+          "id": "spk5",
+          "name": "Amanda Webb",
+          "role": "Director of US Medical Affairs Oncology, Daiichi",
+          "bio": "Amanda Webb is responsible for the medical strategy and execution related to Fam-Trastuzumab Deruxtecan-nxki (T-DXd) at Daiichi."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "agenda1",
+          "time": "9:00 AM",
+          "title": "Welcome Remarks and Transition to CME",
+          "description": "Opening remarks by Dr. Ralph Boccia, introducing the symposium and outlining the day's agenda.",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "greeting"
+        },
+        {
+          "id": "agenda2",
+          "time": "9:05 AM",
+          "title": "Updates in HER2-Positive Breast Cancer",
+          "description": "Dr. Claudine Isaacs presents the latest research and clinical advancements in HER2-positive breast cancer treatment.",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "her2"
+        },
+        {
+          "id": "agenda3",
+          "time": "9:50 AM",
+          "title": "Updates in Triple Negative Breast Cancer",
+          "description": "Dr. Filipa Lynce discusses current and emerging therapies for triple-negative breast cancer.",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "tnbc"
+        },
+        {
+          "id": "agenda4",
+          "time": "10:35 AM",
+          "title": "Updates in HR+ Breast Cancer",
+          "description": "Dr. Hope Rugo provides an overview of the latest developments in HR+ breast cancer treatment strategies.",
+          "durationMinutes": 45,
+          "type": "keynote",
+          "imageKeyword": "hrpositive"
+        },
+        {
+          "id": "agenda5",
+          "time": "11:20 AM",
+          "title": "Break and Visit Virtual Exhibit Hall",
+          "description": "A short break for attendees to network and explore the virtual exhibit hall.",
+          "durationMinutes": 10,
+          "type": "break",
+          "imageKeyword": "coffee"
+        },
+        {
+          "id": "agenda6",
+          "time": "11:30 AM",
+          "title": "Clinical Panel Discussion: Challenging Cases and Future Directions",
+          "description": "Dr. Lynce and Dr. Rugo engage in a panel discussion on challenging clinical cases and future directions in breast cancer research.",
+          "durationMinutes": 15,
+          "type": "panel",
+          "imageKeyword": "discussion"
+        },
+        {
+          "id": "agenda7",
+          "time": "11:45 AM",
+          "title": "Room Transition",
+          "description": "Transition to next session",
+          "durationMinutes": 5,
+          "type": "break",
+          "imageKeyword": "transition"
+        },
+        {
+          "id": "agenda8",
+          "time": "11:50 AM",
+          "title": "Fam-Trastuzumab Deruxtecan-nxki (T-DXd) for Eligible Patients With Metastatic Breast Cancer",
+          "description": "Amanda Webb presents data and insights on the use of T-DXd in metastatic breast cancer patients.",
+          "durationMinutes": 30,
+          "type": "keynote",
+          "imageKeyword": "medicine"
+        },
+        {
+          "id": "agenda9",
+          "time": "12:20 PM",
+          "title": "Closing Remarks and Visit Virtual Exhibit Hall",
+          "description": "Concluding remarks and final opportunity to visit the virtual exhibit hall.",
+          "durationMinutes": 5,
+          "type": "other",
+          "imageKeyword": "farewell"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task1",
+          "title": "Webinar Platform Setup (Zoom)",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "task2",
+          "title": "Speaker Tech Checks and Rehearsals",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "task3",
+          "title": "Create Registration Page and Email Sequence",
+          "status": "completed",
+          "priority": "high"
+        },
+        {
+          "id": "task4",
+          "title": "Design Virtual Exhibit Hall",
+          "status": "in-progress",
+          "priority": "medium"
+        },
+        {
+          "id": "task5",
+          "title": "Promotional Digital Ads Campaign",
+          "status": "pending",
+          "priority": "medium"
+        },
+        {
+          "id": "task6",
+          "title": "Ensure Speaker Lighting and Audio Quality",
+          "status": "pending",
+          "priority": "high"
+        }
+      ],
+      "budget": {
+        "totalBudget": 15000,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 5000,
+            "category": "Software",
+            "label": "Zoom Webinar Platform"
+          },
+          {
+            "amount": 4000,
+            "category": "Marketing",
+            "label": "Digital Advertising Campaign"
+          },
+          {
+            "amount": 6000,
+            "category": "Speakers",
+            "label": "Speaker Honorariums"
+          }
+        ]
+      },
+      "marketingTagline": "Stay Informed, Stay Ahead: Innovations in Breast Cancer Treatment",
+      "date": "November 16, 2024",
+      "estimatedAttendees": 50,
+      "location": "Zoom Webinar",
+      "targetAudience": "Oncologists, Hematologists, Medical Professionals",
+      "id": "ml9t673ftnyl5f4ey",
+      "createdAt": 1770317232747,
+      "integrationConfig": {
+        "type": "zoom",
+        "platformId": "mock-id"
+      }
+    },
+    {
+      "title": "Test Webinar: Exploring New Horizons",
+      "description": "A comprehensive webinar exploring the latest trends and insights in the field.",
+      "theme": "Innovation and Growth",
+      "imageKeyword": "innovation",
+      "speakers": [
+        {
+          "id": "spk1",
+          "name": "Dr. Anya Sharma",
+          "role": "Chief Innovation Officer",
+          "bio": "Dr. Sharma is a leading expert in technological advancements, with over 15 years of experience in the tech industry."
+        },
+        {
+          "id": "spk2",
+          "name": "Kenji Tanaka",
+          "role": "Senior Strategist",
+          "bio": "Kenji is a seasoned strategist specializing in emerging markets and global business development. He brings a unique perspective to understanding market dynamics."
+        },
+        {
+          "id": "spk3",
+          "name": "Maria Rodriguez",
+          "role": "Marketing Director",
+          "bio": "Maria is an award-winning marketing director with a proven track record of building successful brands and driving customer engagement."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "ag1",
+          "time": "09:00 AM",
+          "title": "Welcome and Introduction",
+          "description": "Opening remarks and introduction to the webinar topic.",
+          "durationMinutes": 10,
+          "type": "keynote",
+          "imageKeyword": "greeting"
+        },
+        {
+          "id": "ag2",
+          "time": "09:10 AM",
+          "title": "Keynote: The Future is Now",
+          "description": "Dr. Anya Sharma discusses the latest trends shaping the future of innovation.",
+          "durationMinutes": 25,
+          "type": "keynote",
+          "imageKeyword": "future"
+        },
+        {
+          "id": "ag3",
+          "time": "09:35 AM",
+          "title": "Interactive Poll #1",
+          "description": "Audience participation poll on key trends.",
+          "durationMinutes": 5,
+          "type": "break",
+          "imageKeyword": "poll"
+        },
+        {
+          "id": "ag4",
+          "time": "09:40 AM",
+          "title": "Global Strategy Insights",
+          "description": "Kenji Tanaka shares insights on navigating emerging markets.",
+          "durationMinutes": 25,
+          "type": "workshop",
+          "imageKeyword": "globe"
+        },
+        {
+          "id": "ag5",
+          "time": "10:05 AM",
+          "title": "Interactive Q&A",
+          "description": "Live question and answer session with Kenji Tanaka.",
+          "durationMinutes": 10,
+          "type": "break",
+          "imageKeyword": "question"
+        },
+        {
+          "id": "ag6",
+          "time": "10:15 AM",
+          "title": "Marketing Strategies for Growth",
+          "description": "Maria Rodriguez presents effective marketing strategies for business growth.",
+          "durationMinutes": 25,
+          "type": "workshop",
+          "imageKeyword": "marketing"
+        },
+        {
+          "id": "ag7",
+          "time": "10:40 AM",
+          "title": "Interactive Poll #2",
+          "description": "Audience participation poll on marketing strategy preferences.",
+          "durationMinutes": 5,
+          "type": "break",
+          "imageKeyword": "poll"
+        },
+        {
+          "id": "ag8",
+          "time": "10:45 AM",
+          "title": "Panel Discussion: Innovation in Action",
+          "description": "A panel discussion with all speakers, moderated by an expert.",
+          "durationMinutes": 30,
+          "type": "panel",
+          "imageKeyword": "panel"
+        },
+        {
+          "id": "ag9",
+          "time": "11:15 AM",
+          "title": "Closing Remarks",
+          "description": "Summary of key takeaways and closing statements.",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "conclusion"
+        },
+        {
+          "id": "ag10",
+          "time": "11:20 AM",
+          "title": "Q&A Session",
+          "description": "Open question and answer session with all speakers.",
+          "durationMinutes": 20,
+          "type": "break",
+          "imageKeyword": "question"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task1",
+          "title": "Platform Tech Check",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "task2",
+          "title": "Speaker Lighting Setup",
+          "status": "pending",
+          "priority": "medium"
+        },
+        {
+          "id": "task3",
+          "title": "Webinar Setup and Configuration",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "task4",
+          "title": "Email Sequence Design",
+          "status": "completed",
+          "priority": "high"
+        }
+      ],
+      "budget": {
+        "totalBudget": 5000,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 1500,
+            "category": "Software",
+            "label": "Streaming Software License"
+          },
+          {
+            "amount": 2000,
+            "category": "Marketing",
+            "label": "Digital Advertising Campaign"
+          },
+          {
+            "amount": 1500,
+            "category": "Speakers",
+            "label": "Speaker Honorariums"
+          }
+        ]
+      },
+      "marketingTagline": "Innovate, Strategize, Grow",
+      "date": "November 15, 2024",
+      "estimatedAttendees": 50,
+      "location": "Zoom Webinar",
+      "targetAudience": "Business professionals, entrepreneurs, and industry leaders",
+      "id": "ml9ssk3wn4vmr3r0c",
+      "createdAt": 1770316596428,
+      "integrationConfig": {
+        "type": "zoom",
+        "platformId": "mock-id"
+      }
+    },
+    {
+      "title": "Decoding Digital Disruption: Strategies for Tomorrow's Leaders",
+      "description": "Explore the transformative power of digital disruption and equip yourself with the strategies to navigate the evolving business landscape. Learn from industry experts and gain actionable insights to future-proof your organization.",
+      "theme": "Digital Transformation",
+      "imageKeyword": "technology",
+      "speakers": [
+        {
+          "id": "spk1",
+          "name": "Dr. Anya Sharma",
+          "role": "Chief Innovation Officer, GlobalTech Solutions",
+          "bio": "Dr. Sharma is a leading expert in digital transformation, with over 15 years of experience helping organizations leverage technology to drive growth and innovation."
+        },
+        {
+          "id": "spk2",
+          "name": "Marcus Johnson",
+          "role": "Founder & CEO, InnovateNow Consulting",
+          "bio": "Marcus is a serial entrepreneur and consultant specializing in helping startups and established businesses adapt to disruptive technologies."
+        },
+        {
+          "id": "spk3",
+          "name": "Elena Rodriguez",
+          "role": "Senior Analyst, Future Trends Institute",
+          "bio": "Elena is a seasoned market analyst focusing on emerging technology trends and their impact on various industries."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "ag1",
+          "time": "09:00 AM",
+          "title": "Welcome & Opening Remarks",
+          "description": "Setting the stage for the webinar and introducing the key themes.",
+          "durationMinutes": 10,
+          "type": "keynote",
+          "imageKeyword": "microphone"
+        },
+        {
+          "id": "ag2",
+          "time": "09:10 AM",
+          "title": "Keynote: The Disruptive Landscape",
+          "description": "Dr. Anya Sharma explores the key drivers of digital disruption and their impact on various industries.",
+          "durationMinutes": 25,
+          "type": "keynote",
+          "imageKeyword": "computer"
+        },
+        {
+          "id": "ag3",
+          "time": "09:35 AM",
+          "title": "Interactive Poll: Your Biggest Challenges",
+          "description": "Engage with the audience to identify the most pressing challenges related to digital transformation.",
+          "durationMinutes": 5,
+          "type": "break",
+          "imageKeyword": "poll"
+        },
+        {
+          "id": "ag4",
+          "time": "09:40 AM",
+          "title": "Panel Discussion: Strategies for Success",
+          "description": "Marcus Johnson and Elena Rodriguez share practical strategies for navigating digital disruption and building resilient organizations.",
+          "durationMinutes": 30,
+          "type": "panel",
+          "imageKeyword": "panel"
+        },
+        {
+          "id": "ag5",
+          "time": "10:10 AM",
+          "title": "Q&A Session",
+          "description": "An opportunity for attendees to ask questions and engage with the speakers.",
+          "durationMinutes": 15,
+          "type": "networking",
+          "imageKeyword": "question"
+        },
+        {
+          "id": "ag6",
+          "time": "10:25 AM",
+          "title": "Closing Remarks & Next Steps",
+          "description": "Summarizing the key takeaways and outlining actionable steps for attendees.",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "handshake"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task1",
+          "title": "Webinar Platform Setup (Zoom)",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "task2",
+          "title": "Speaker Tech Check & Rehearsal",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "task3",
+          "title": "Design and Schedule Email Sequence (Registration, Reminders, Follow-up)",
+          "status": "completed",
+          "priority": "high"
+        },
+        {
+          "id": "task4",
+          "title": "Optimize Speaker Lighting and Audio",
+          "status": "pending",
+          "priority": "medium"
+        },
+        {
+          "id": "task5",
+          "title": "Create Interactive Poll Questions",
+          "status": "completed",
+          "priority": "medium"
+        }
+      ],
+      "budget": {
+        "totalBudget": 5000,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 1000,
+            "category": "Streaming Software",
+            "label": "Zoom Webinar Platform"
+          },
+          {
+            "amount": 2500,
+            "category": "Digital Ads",
+            "label": "LinkedIn & Google Ads Campaign"
+          },
+          {
+            "amount": 1500,
+            "category": "Speaker Fees",
+            "label": "Honorarium for Speakers"
+          }
+        ]
+      },
+      "marketingTagline": "Unlock Your Digital Potential",
+      "date": "November 15, 2024",
+      "estimatedAttendees": 50,
+      "location": "Zoom Webinar Platform",
+      "targetAudience": "Business leaders, IT professionals, and anyone interested in digital transformation.",
+      "id": "ml9soo9ic5wg4kp50",
+      "createdAt": 1770316415190,
+      "integrationConfig": {
+        "type": "zoom",
+        "platformId": "mock-id"
+      }
+    },
+    {
+      "title": "Unlocking Insights: The asd Webinar",
+      "description": "A comprehensive webinar exploring the intricacies of asd, designed for professionals and enthusiasts alike. Gain valuable insights and actionable strategies from our expert speakers.",
+      "theme": "Innovation and Exploration",
+      "imageKeyword": "technology",
+      "speakers": [
+        {
+          "id": "spk1",
+          "name": "Dr. Anya Sharma",
+          "role": "Lead Researcher, Cognitive Sciences Institute",
+          "bio": "Dr. Sharma is a renowned expert in cognitive processes, specializing in innovative learning methodologies and strategies."
+        },
+        {
+          "id": "spk2",
+          "name": "David Chen",
+          "role": "Senior Consultant, Strategic Solutions Group",
+          "bio": "David Chen brings over 15 years of experience in strategic planning and execution, focusing on improving organizational performance."
+        },
+        {
+          "id": "spk3",
+          "name": "Maria Rodriguez",
+          "role": "Founder, TechEd Innovators",
+          "bio": "Maria Rodriguez is an entrepreneur and advocate for accessible technology, driving advancements in user engagement and education."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "age1",
+          "time": "10:00 AM",
+          "title": "Welcome and Introduction",
+          "description": "Opening remarks and an overview of the webinar's objectives.",
+          "durationMinutes": 10,
+          "type": "keynote",
+          "imageKeyword": "microphone"
+        },
+        {
+          "id": "age2",
+          "time": "10:10 AM",
+          "title": "Diving Deep into asd: Key Concepts",
+          "description": "Dr. Anya Sharma introduces the core principles of asd.",
+          "durationMinutes": 20,
+          "type": "keynote",
+          "imageKeyword": "brain"
+        },
+        {
+          "id": "age3",
+          "time": "10:30 AM",
+          "title": "Interactive Poll: Understanding Your Current Perspective",
+          "description": "A quick poll to gauge audience understanding and tailor the discussion.",
+          "durationMinutes": 5,
+          "type": "other",
+          "imageKeyword": "poll"
+        },
+        {
+          "id": "age4",
+          "time": "10:35 AM",
+          "title": "Strategic Implementation: A Case Study",
+          "description": "David Chen presents a real-world example of asd in action.",
+          "durationMinutes": 20,
+          "type": "keynote",
+          "imageKeyword": "briefcase"
+        },
+        {
+          "id": "age5",
+          "time": "10:55 AM",
+          "title": "Innovation Showcase: TechEd's Approach",
+          "description": "Maria Rodriguez demonstrates cutting-edge technologies related to asd.",
+          "durationMinutes": 20,
+          "type": "keynote",
+          "imageKeyword": "computer"
+        },
+        {
+          "id": "age6",
+          "time": "11:15 AM",
+          "title": "Q&A Session with Speakers",
+          "description": "An opportunity for attendees to ask questions to our panel of experts.",
+          "durationMinutes": 20,
+          "type": "panel",
+          "imageKeyword": "question"
+        },
+        {
+          "id": "age7",
+          "time": "11:35 AM",
+          "title": "Closing Remarks and Next Steps",
+          "description": "Concluding thoughts and information on further resources.",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "handshake"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "tsk1",
+          "title": "Webinar Platform Setup",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "tsk2",
+          "title": "Speaker Tech Check and Rehearsal",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "tsk3",
+          "title": "Create and Schedule Email Sequences",
+          "status": "completed",
+          "priority": "medium"
+        },
+        {
+          "id": "tsk4",
+          "title": "Verify Speaker Lighting and Audio",
+          "status": "pending",
+          "priority": "medium"
+        }
+      ],
+      "budget": {
+        "totalBudget": 5000,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 2000,
+            "category": "Software",
+            "label": "Streaming Software License (Custom Platform)"
+          },
+          {
+            "amount": 1500,
+            "category": "Marketing",
+            "label": "Digital Advertising Campaign"
+          },
+          {
+            "amount": 1500,
+            "category": "Speaker Fees",
+            "label": "Honorarium for Speakers"
+          }
+        ]
+      },
+      "marketingTagline": "Discover the Power of asd: Strategies for Success",
+      "date": "November 8, 2024",
+      "estimatedAttendees": 50,
+      "location": "Custom Webinar Platform",
+      "targetAudience": "Professionals, researchers, and enthusiasts interested in learning more about asd.",
+      "id": "ml9s0ocam8cuje294",
+      "createdAt": 1770315295547,
+      "integrationConfig": {
+        "type": "custom",
+        "platformId": "mock-id"
+      }
+    },
+    {
+      "title": "A Virtual Italian Feast: Celebrating [Name]'s 50th!",
+      "description": "Join us for a heartwarming virtual Italian dinner party as we celebrate [Name]'s 50th birthday! We'll share stories, enjoy a virtual Italian cooking demonstration, and raise a glass to [Name]'s incredible life. This virtual event is designed to bring family together, no matter the distance.",
+      "theme": "Virtual Italian Dinner Party",
+      "imageKeyword": "pasta",
+      "speakers": [
+        {
+          "id": "SPK001",
+          "name": "Sofia Rossi",
+          "role": "Family Historian",
+          "bio": "Sofia is a passionate genealogist specializing in Italian-American family histories and will be sharing memorable stories about [Name]'s family."
+        },
+        {
+          "id": "SPK002",
+          "name": "Marco Bellini",
+          "role": "Chef and Restaurateur",
+          "bio": "Marco is a renowned Italian chef and owner of 'Bellini's Trattoria'. He will lead a virtual cooking demonstration of a classic Italian dish."
+        },
+        {
+          "id": "SPK003",
+          "name": "Elena Lombardi",
+          "role": "Sommelier",
+          "bio": "Elena is a certified sommelier with extensive knowledge of Italian wines. She'll guide us through a virtual wine pairing experience."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "AGEN001",
+          "time": "6:00 PM",
+          "title": "Welcome & Virtual Arrival Cocktails",
+          "description": "Guests arrive and enjoy a welcome message. Suggest a signature cocktail ahead of time for everyone to prepare.",
+          "durationMinutes": 15,
+          "type": "keynote",
+          "imageKeyword": "cocktail"
+        },
+        {
+          "id": "AGEN002",
+          "time": "6:15 PM",
+          "title": "Family History & Story Sharing with Sofia Rossi",
+          "description": "Sofia Rossi shares captivating stories about [Name]'s family history, followed by an open mic for family members to share their favorite memories.",
+          "durationMinutes": 30,
+          "type": "keynote",
+          "imageKeyword": "family"
+        },
+        {
+          "id": "AGEN003",
+          "time": "6:45 PM",
+          "title": "Virtual Italian Cooking Demonstration with Chef Marco Bellini",
+          "description": "Chef Marco Bellini leads a step-by-step demonstration of a classic Italian dish (e.g., Pasta Carbonara). Guests can cook along or simply enjoy the show.",
+          "durationMinutes": 45,
+          "type": "workshop",
+          "imageKeyword": "cooking"
+        },
+        {
+          "id": "AGEN004",
+          "time": "7:30 PM",
+          "title": "Wine Pairing & Toast with Elena Lombardi",
+          "description": "Elena Lombardi guides guests through a virtual wine pairing experience, followed by a heartfelt toast to [Name].",
+          "durationMinutes": 30,
+          "type": "keynote",
+          "imageKeyword": "wine"
+        },
+        {
+          "id": "AGEN005",
+          "time": "8:00 PM",
+          "title": "Open Chat & Birthday Wishes",
+          "description": "An open forum for guests to chat, share birthday wishes, and enjoy each other's company virtually.",
+          "durationMinutes": 30,
+          "type": "networking",
+          "imageKeyword": "conversation"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TASK001",
+          "title": "Select Webinar Platform (Zoom, Bigmarker)",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "TASK002",
+          "title": "Create Email Sequence (Invitations, Reminders, Follow-up)",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "TASK003",
+          "title": "Tech Check with Speakers (Internet, Lighting, Audio)",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "TASK004",
+          "title": "Prepare Virtual Backgrounds & Overlays",
+          "status": "in-progress",
+          "priority": "medium"
+        },
+        {
+          "id": "TASK005",
+          "title": "Set Up Webinar Platform (Registration, Settings, Recording)",
+          "status": "pending",
+          "priority": "high"
+        }
+      ],
+      "budget": {
+        "totalBudget": 1500,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 300,
+            "category": "Software",
+            "label": "Streaming Software (Zoom Pro/Bigmarker)"
+          },
+          {
+            "amount": 500,
+            "category": "Marketing",
+            "label": "Digital Ads (Facebook, Instagram)"
+          },
+          {
+            "amount": 700,
+            "category": "Speakers",
+            "label": "Speaker Fees (Sofia, Marco, Elena)"
+          }
+        ]
+      },
+      "marketingTagline": "Mangia, Prega, Ama: Celebrate [Name]'s 50th Italian Style!",
+      "date": "October 26, 2024",
+      "estimatedAttendees": 50,
+      "location": "Zoom",
+      "targetAudience": "Family and close friends",
+      "id": "ml9rx976t647bqmoq",
+      "createdAt": 1770315135954
+    },
+    {
+      "title": "Reimagine: The Future of Car Design",
+      "description": "A virtual webinar exploring the cutting-edge trends and innovations shaping the future of automotive design. Join leading experts as they discuss sustainability, technology integration, and the evolving consumer expectations in the car industry.",
+      "theme": "Futuristic Automotive Design",
+      "imageKeyword": "futuristic car",
+      "speakers": [
+        {
+          "id": "spk1",
+          "name": "Dr. Anya Sharma",
+          "role": "Lead Design Strategist, AutoVision",
+          "bio": "Dr. Sharma specializes in sustainable design and user-centric automotive solutions. She has published extensively on the intersection of AI and automotive design."
+        },
+        {
+          "id": "spk2",
+          "name": "Kenji Tanaka",
+          "role": "Chief Innovation Officer, MotoDrive",
+          "bio": "Kenji is a visionary in electric vehicle (EV) design and battery technology, pushing the boundaries of performance and efficiency in modern automobiles."
+        },
+        {
+          "id": "spk3",
+          "name": "Isabella Rossi",
+          "role": "Senior Design Manager, Global Motors",
+          "bio": "Isabella is known for her work on integrating advanced technology into vehicle interiors and exteriors, focusing on creating seamless and intuitive user experiences."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "ag1",
+          "time": "10:00 AM",
+          "title": "Welcome and Introduction",
+          "description": "Brief overview of the webinar and introduction of the speakers.",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "introduction"
+        },
+        {
+          "id": "ag2",
+          "time": "10:05 AM",
+          "title": "Keynote: Sustainable Materials in Car Design",
+          "description": "Dr. Anya Sharma discusses the latest advancements in sustainable materials and their impact on the future of car manufacturing.",
+          "durationMinutes": 20,
+          "type": "keynote",
+          "imageKeyword": "recycling"
+        },
+        {
+          "id": "ag3",
+          "time": "10:25 AM",
+          "title": "Q&A with Dr. Sharma",
+          "description": "Live Q&A session with Dr. Anya Sharma. Attendees can submit their questions.",
+          "durationMinutes": 10,
+          "type": "panel",
+          "imageKeyword": "question"
+        },
+        {
+          "id": "ag4",
+          "time": "10:35 AM",
+          "title": "Keynote: The Future of EV Technology",
+          "description": "Kenji Tanaka shares insights on the future of electric vehicle technology, including battery innovations and performance enhancements.",
+          "durationMinutes": 20,
+          "type": "keynote",
+          "imageKeyword": "electric car"
+        },
+        {
+          "id": "ag5",
+          "time": "10:55 AM",
+          "title": "Interactive Poll: EV Adoption",
+          "description": "Attendees participate in a live poll about their perceptions and expectations regarding EV adoption.",
+          "durationMinutes": 5,
+          "type": "break",
+          "imageKeyword": "poll"
+        },
+        {
+          "id": "ag6",
+          "time": "11:00 AM",
+          "title": "Keynote: User Experience in Automotive Design",
+          "description": "Isabella Rossi explores the evolving role of user experience in car design, focusing on seamless technology integration and intuitive interfaces.",
+          "durationMinutes": 20,
+          "type": "keynote",
+          "imageKeyword": "dashboard"
+        },
+        {
+          "id": "ag7",
+          "time": "11:20 AM",
+          "title": "Panel Discussion: The Future is Now",
+          "description": "A panel discussion with all speakers, moderated, about the key trends and challenges in car design.",
+          "durationMinutes": 20,
+          "type": "panel",
+          "imageKeyword": "discussion"
+        },
+        {
+          "id": "ag8",
+          "time": "11:40 AM",
+          "title": "Closing Remarks",
+          "description": "Summary of key takeaways and thank you to attendees.",
+          "durationMinutes": 5,
+          "type": "other",
+          "imageKeyword": "conclusion"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "tsk1",
+          "title": "Zoom Webinar Setup",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "tsk2",
+          "title": "Speaker Tech Check and Rehearsal",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "tsk3",
+          "title": "Design Email Sequence for Registration and Follow-up",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "tsk4",
+          "title": "Confirm Speaker Lighting and Audio",
+          "status": "pending",
+          "priority": "medium"
+        },
+        {
+          "id": "tsk5",
+          "title": "Promote Webinar on Social Media",
+          "status": "pending",
+          "priority": "medium"
+        }
+      ],
+      "budget": {
+        "totalBudget": 5000,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 1500,
+            "category": "Software",
+            "label": "Zoom Webinar Platform"
+          },
+          {
+            "amount": 2000,
+            "category": "Marketing",
+            "label": "Digital Advertising (LinkedIn, Automotive Blogs)"
+          },
+          {
+            "amount": 1500,
+            "category": "Speakers",
+            "label": "Speaker Honorariums (Dr. Sharma, Mr. Tanaka, Ms. Rossi)"
+          }
+        ]
+      },
+      "marketingTagline": "Drive the Future: Innovations in Car Design",
+      "date": "November 15, 2024",
+      "estimatedAttendees": 50,
+      "location": "Zoom Webinar",
+      "targetAudience": "Automotive designers, engineers, industry professionals, and enthusiasts.",
+      "id": "ml9rwmnvw8lva7seu",
+      "createdAt": 1770315106747,
+      "integrationConfig": {
+        "type": "zoom",
+        "platformId": "mock-id"
+      }
+    },
+    {
+      "title": "Medical Breakthrough in Pancreatic Cancer: A Live Webinar",
+      "description": "Join us for an insightful webinar exploring the latest medical breakthroughs in pancreatic cancer treatment. Leading experts will discuss innovative therapies, research advancements, and future directions in the fight against this challenging disease.",
+      "theme": "Advancing Pancreatic Cancer Treatment",
+      "imageKeyword": "microscope",
+      "speakers": [
+        {
+          "id": "speaker1",
+          "name": "Dr. Anya Sharma, MD, PhD",
+          "role": "Director of Oncology Research, City General Hospital",
+          "bio": "Dr. Sharma is a leading oncologist specializing in pancreatic cancer research and treatment. She has published extensively on novel therapeutic approaches and personalized medicine."
+        },
+        {
+          "id": "speaker2",
+          "name": "Professor Kenji Tanaka, MD",
+          "role": "Professor of Surgical Oncology, University Medical Center",
+          "bio": "Professor Tanaka is a renowned surgical oncologist with expertise in minimally invasive techniques for pancreatic cancer resection and reconstruction."
+        },
+        {
+          "id": "speaker3",
+          "name": "Maria Rodriguez, RN, BSN",
+          "role": "Oncology Nurse Navigator, Cancer Support Network",
+          "bio": "Maria Rodriguez is an experienced oncology nurse navigator dedicated to providing support and guidance to patients and families affected by pancreatic cancer."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "agenda1",
+          "time": "09:00 AM",
+          "title": "Welcome and Introduction",
+          "description": "Opening remarks and introduction to the webinar topic and speakers.",
+          "durationMinutes": 10,
+          "type": "keynote",
+          "imageKeyword": "stage"
+        },
+        {
+          "id": "agenda2",
+          "time": "09:10 AM",
+          "title": "Novel Therapeutic Approaches in Pancreatic Cancer",
+          "description": "Dr. Anya Sharma discusses the latest advancements in targeted therapies and immunotherapies for pancreatic cancer.",
+          "durationMinutes": 25,
+          "type": "keynote",
+          "imageKeyword": "dna"
+        },
+        {
+          "id": "agenda3",
+          "time": "09:35 AM",
+          "title": "Q&A with Dr. Sharma",
+          "description": "Live Q&A session with Dr. Sharma, addressing audience questions about novel therapies.",
+          "durationMinutes": 10,
+          "type": "panel",
+          "imageKeyword": "question"
+        },
+        {
+          "id": "agenda4",
+          "time": "09:45 AM",
+          "title": "Surgical Innovations in Pancreatic Cancer Treatment",
+          "description": "Professor Kenji Tanaka presents the latest surgical techniques and technologies for pancreatic cancer resection.",
+          "durationMinutes": 25,
+          "type": "keynote",
+          "imageKeyword": "scalpel"
+        },
+        {
+          "id": "agenda5",
+          "time": "10:10 AM",
+          "title": "Q&A with Professor Tanaka",
+          "description": "Live Q&A session with Professor Tanaka, addressing audience questions about surgical innovations.",
+          "durationMinutes": 10,
+          "type": "panel",
+          "imageKeyword": "question"
+        },
+        {
+          "id": "agenda6",
+          "time": "10:20 AM",
+          "title": "Patient Support and Navigation",
+          "description": "Maria Rodriguez discusses the role of oncology nurse navigators in supporting patients and families throughout their cancer journey.",
+          "durationMinutes": 20,
+          "type": "keynote",
+          "imageKeyword": "heart"
+        },
+        {
+          "id": "agenda7",
+          "time": "10:40 AM",
+          "title": "Interactive Poll: Patient Support Needs",
+          "description": "Audience poll to identify key areas where patients and families need the most support.",
+          "durationMinutes": 5,
+          "type": "other",
+          "imageKeyword": "ballot"
+        },
+        {
+          "id": "agenda8",
+          "time": "10:45 AM",
+          "title": "Panel Discussion: The Future of Pancreatic Cancer Treatment",
+          "description": "All speakers participate in a panel discussion on future directions and emerging trends in pancreatic cancer research and treatment.",
+          "durationMinutes": 20,
+          "type": "panel",
+          "imageKeyword": "chat"
+        },
+        {
+          "id": "agenda9",
+          "time": "11:05 AM",
+          "title": "Closing Remarks",
+          "description": "Concluding thoughts and call to action.",
+          "durationMinutes": 5,
+          "type": "keynote",
+          "imageKeyword": "podium"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task1",
+          "title": "Webinar Platform Setup (Zoom)",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "task2",
+          "title": "Speaker Tech Check and Rehearsal",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "task3",
+          "title": "Create Registration Page and Email Sequence",
+          "status": "completed",
+          "priority": "high"
+        },
+        {
+          "id": "task4",
+          "title": "Design Marketing Materials and Digital Ads",
+          "status": "in-progress",
+          "priority": "medium"
+        },
+        {
+          "id": "task5",
+          "title": "Speaker Lighting and Background Check",
+          "status": "pending",
+          "priority": "medium"
+        },
+        {
+          "id": "task6",
+          "title": "Post-Webinar Survey and Follow-up Emails",
+          "status": "pending",
+          "priority": "low"
+        }
+      ],
+      "budget": {
+        "totalBudget": 5000,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 1500,
+            "category": "Software",
+            "label": "Zoom Webinar Platform License"
+          },
+          {
+            "amount": 2000,
+            "category": "Marketing",
+            "label": "Digital Advertising (Google Ads, Social Media)"
+          },
+          {
+            "amount": 1500,
+            "category": "Speaker Fees",
+            "label": "Honorarium for Speakers"
+          }
+        ]
+      },
+      "marketingTagline": "Discover the Future of Pancreatic Cancer Treatment",
+      "date": "November 12, 2024",
+      "estimatedAttendees": 250,
+      "location": "Zoom Webinar",
+      "targetAudience": "Oncologists, surgeons, nurses, researchers, patients, and caregivers interested in pancreatic cancer treatment.",
+      "id": "ml9rjvojxfmtg546h",
+      "createdAt": 1770314511907,
+      "integrationConfig": {
+        "type": "zoom",
+        "platformId": "mock-id"
+      },
+      "websiteHtml": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Medical Breakthrough in Pancreatic Cancer: A Live Webinar</title>\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n</head>\n<body class=\"bg-gray-50 font-sans\">\n\n    <!-- Hero Section -->\n    <section class=\"relative py-20\" style=\"background-image: url('https://picsum.photos/seed/microscope/1200/600'); background-size: cover; background-position: center;\">\n        <div class=\"absolute inset-0 bg-black opacity-50\"></div>\n        <div class=\"container mx-auto px-4 relative z-10\">\n            <div class=\"grid grid-cols-1 md:grid-cols-2 gap-8 items-center\">\n                <div class=\"text-white\">\n                    <h1 class=\"text-4xl md:text-5xl font-bold mb-4 leading-tight\">Medical Breakthrough in Pancreatic Cancer: A Live Webinar</h1>\n                    <p class=\"text-lg mb-6\">Join us for an insightful webinar exploring the latest medical breakthroughs in pancreatic cancer treatment.</p>\n                    <p class=\"text-gray-200 mb-4\"><strong>Date:</strong> November 12, 2024</p>\n                    <p class=\"text-gray-200 mb-4\"><strong>Tagline:</strong> Discover the Future of Pancreatic Cancer Treatment</p>\n                </div>\n\n                <div class=\"bg-white p-8 rounded-xl shadow-lg\">\n                    <h2 class=\"text-2xl font-semibold mb-4 text-gray-800\">Register Now</h2>\n                    <form id=\"registration-form\" class=\"space-y-4\">\n                        <div>\n                            <label for=\"first_name\" class=\"block text-sm font-medium text-gray-700\">First Name</label>\n                            <input type=\"text\" name=\"first_name\" id=\"first_name\" class=\"mt-1 p-2 w-full border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm\">\n                        </div>\n                        <div>\n                            <label for=\"last_name\" class=\"block text-sm font-medium text-gray-700\">Last Name</label>\n                            <input type=\"text\" name=\"last_name\" id=\"last_name\" class=\"mt-1 p-2 w-full border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm\">\n                        </div>\n                        <div>\n                            <label for=\"email\" class=\"block text-sm font-medium text-gray-700\">Email</label>\n                            <input type=\"email\" name=\"email\" id=\"email\" class=\"mt-1 p-2 w-full border rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm\" required>\n                        </div>\n                        <div>\n                            <button type=\"submit\" class=\"w-full py-3 px-4 bg-indigo-600 text-white font-semibold rounded-md shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2\">Register via Zoom</button>\n                        </div>\n                    </form>\n                </div>\n            </div>\n        </div>\n    </section>\n\n    <!-- Speakers Section -->\n    <section class=\"py-16 bg-gray-100\">\n        <div class=\"container mx-auto px-4\">\n            <h2 class=\"text-3xl font-bold text-center text-gray-800 mb-8\">Meet the Speakers</h2>\n            <div class=\"grid grid-cols-1 md:grid-cols-3 gap-8\">\n              \n      <div class=\"bg-white p-6 rounded-xl shadow-md flex flex-col items-center text-center\">\n        <img src=\"https://i.pravatar.cc/150?u=speaker1\" alt=\"Dr. Anya Sharma, MD, PhD\" class=\"w-24 h-24 rounded-full mb-4 object-cover border-4 border-indigo-50\">\n        <h3 class=\"text-xl font-bold text-slate-900\">Dr. Anya Sharma, MD, PhD</h3>\n        <p class=\"text-indigo-600 font-medium mb-2\">Director of Oncology Research, City General Hospital</p>\n        <p class=\"text-slate-600 text-sm\">Dr. Sharma is a leading oncologist specializing in pancreatic cancer research and treatment. She has published extensively on novel therapeutic approaches and personalized medicine.</p>\n      </div>\n    \n      <div class=\"bg-white p-6 rounded-xl shadow-md flex flex-col items-center text-center\">\n        <img src=\"https://i.pravatar.cc/150?u=speaker2\" alt=\"Professor Kenji Tanaka, MD\" class=\"w-24 h-24 rounded-full mb-4 object-cover border-4 border-indigo-50\">\n        <h3 class=\"text-xl font-bold text-slate-900\">Professor Kenji Tanaka, MD</h3>\n        <p class=\"text-indigo-600 font-medium mb-2\">Professor of Surgical Oncology, University Medical Center</p>\n        <p class=\"text-slate-600 text-sm\">Professor Tanaka is a renowned surgical oncologist with expertise in minimally invasive techniques for pancreatic cancer resection and reconstruction.</p>\n      </div>\n    \n      <div class=\"bg-white p-6 rounded-xl shadow-md flex flex-col items-center text-center\">\n        <img src=\"https://i.pravatar.cc/150?u=speaker3\" alt=\"Maria Rodriguez, RN, BSN\" class=\"w-24 h-24 rounded-full mb-4 object-cover border-4 border-indigo-50\">\n        <h3 class=\"text-xl font-bold text-slate-900\">Maria Rodriguez, RN, BSN</h3>\n        <p class=\"text-indigo-600 font-medium mb-2\">Oncology Nurse Navigator, Cancer Support Network</p>\n        <p class=\"text-slate-600 text-sm\">Maria Rodriguez is an experienced oncology nurse navigator dedicated to providing support and guidance to patients and families affected by pancreatic cancer.</p>\n      </div>\n    \n            </div>\n        </div>\n    </section>\n\n    <!-- Agenda Section -->\n    <section class=\"py-16\">\n        <div class=\"container mx-auto px-4\">\n            <h2 class=\"text-3xl font-bold text-center text-gray-800 mb-8\">What You'll Learn</h2>\n            <div class=\"grid grid-cols-1 md:grid-cols-2 gap-8\">\n                <div>\n                    <h3 class=\"text-xl font-semibold mb-2 text-gray-700\">Agenda Highlights:</h3>\n                    <ul class=\"list-disc list-inside text-gray-600\">\n                        <li>09:00 AM - Welcome and Introduction</li>\n                        <li>09:10 AM - Novel Therapeutic Approaches in Pancreatic Cancer</li>\n                        <li>09:35 AM - Q&A with Dr. Sharma</li>\n                        <li>09:45 AM - Surgical Innovations in Pancreatic Cancer Treatment</li>\n                        <li>10:10 AM - Q&A with Professor Tanaka</li>\n                        <li>...and more!</li>\n                    </ul>\n                </div>\n                <div>\n                    <p class=\"text-gray-600\">This webinar offers a comprehensive overview of the latest advancements in pancreatic cancer treatment, from novel therapies to surgical innovations. You'll gain valuable insights from leading experts in the field and have the opportunity to ask questions and engage in discussions.</p>\n                </div>\n            </div>\n        </div>\n    </section>\n\n    <!-- Footer -->\n    <footer class=\"bg-gray-800 py-8 text-white text-center\">\n        <p>&copy; 2024 Pancreatic Cancer Webinar. All rights reserved.</p>\n    </footer>\n\n    <script>\n        document.addEventListener('DOMContentLoaded', () => {\n          const form = document.querySelector('form');\n          if (form) {\n            form.addEventListener('submit', (e) => {\n              e.preventDefault();\n              const formData = new FormData(form);\n              const data = Object.fromEntries(formData.entries());\n              \n              // Simulate API Submission / Backend Save\n              console.log('Submitting registration for event: ml9rjvojxfmtg546h', data);\n              \n              // If running in iframe preview, send to parent (Dashboard) to save to local backend\n              if (window.parent) {\n                window.parent.postMessage({\n                  type: 'EVENT_REGISTRATION',\n                  eventId: 'ml9rjvojxfmtg546h',\n                  payload: {\n                    ...data, // Capture all custom fields\n                    name: data.name || (data['first_name'] + ' ' + data['last_name']),\n                    email: data.email,\n                  }\n                }, '*');\n              }\n              \n              const btn = form.querySelector('button');\n              const originalText = btn.innerText;\n              btn.innerText = 'Registered!';\n              btn.disabled = true;\n              btn.classList.add('bg-green-600');\n              \n              alert('Registration confirmed! You have been added to the database.');\n            });\n          }\n        });\n      </script>\n</body>\n</html>"
+    }
+  ],
+  "users": [
+    {
+      "email": "gdraskovic+test@gmail.com",
+      "name": "Goran Draskovic",
+      "orgName": "Test",
+      "token": null,
+      "tokenExpires": 1770319987960,
+      "isAuthenticated": true
+    },
+    {
+      "email": "gdraskovic+test2@gmail.com",
+      "name": "Test Test",
+      "orgName": "test",
+      "token": null,
+      "tokenExpires": 1770320163142,
+      "isAuthenticated": true
+    },
+    {
+      "email": "gdraskovic@gmail.com",
+      "name": "Goran Draskovic",
+      "orgName": "Test2",
+      "token": null,
+      "tokenExpires": 1770320683995,
+      "isAuthenticated": true
+    },
+    {
+      "email": "qujupehu@mailinator.com",
+      "name": "Magna quos vel volup Voluptate qui et est",
+      "orgName": "Molestiae voluptatem",
+      "token": null,
+      "tokenExpires": 1770321027678,
+      "isAuthenticated": true
+    },
+    {
+      "email": "dota@mailinator.com",
+      "name": "Dolorem aute id dolo Hic est labore sapi",
+      "orgName": "Debitis nisi autem t",
+      "token": null,
+      "tokenExpires": 1770321593238,
+      "isAuthenticated": true
+    },
+    {
+      "email": "cegym@mailinator.com",
+      "name": "Soluta laborum Labo Eum reprehenderit el",
+      "orgName": "Voluptatem deserunt ",
+      "token": null,
+      "tokenExpires": 1770321779944,
+      "isAuthenticated": true
+    }
+  ]
 }

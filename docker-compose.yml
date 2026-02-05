@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  eventbuilder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eventbuilder-app
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - NODE_ENV=development
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-e1cba1603207319c8075907676972309e1cba1603207319c8075907676972309}
+      - BIGMARKER_API_KEY=${BIGMARKER_API_KEY}
+      - ZOOM_API_KEY=${ZOOM_API_KEY}
+      - VIMEO_API_KEY=${VIMEO_API_KEY}
+    volumes:
+      # Persist database between restarts
+      - ./database.json:/app/database.json
+      # Optional: Mount source for development (hot reload not available with Node)
+      # - ./server.js:/app/server.js
+      # - ./components:/app/components
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Optional: Development service with nodemon for hot reload
+  eventbuilder-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: eventbuilder-dev
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+      - NODE_ENV=development
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-e1cba1603207319c8075907676972309e1cba1603207319c8075907676972309}
+      - BIGMARKER_API_KEY=${BIGMARKER_API_KEY}
+      - ZOOM_API_KEY=${ZOOM_API_KEY}
+      - VIMEO_API_KEY=${VIMEO_API_KEY}
+    volumes:
+      - ./database.json:/app/database.json
+      - ./server.js:/app/server.js
+      - ./src:/app/src
+      - ./components:/app/components
+      - ./App.tsx:/app/App.tsx
+      - ./.env:/app/.env
+      - ./services:/app/services
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    profiles:
+      - dev
+    depends_on:
+      - eventbuilder
+
+volumes:
+  eventbuilder-data:
+    driver: local

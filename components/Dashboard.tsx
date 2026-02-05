@@ -29,7 +29,9 @@ import {
   Trash2,
   Plus,
   Save,
-  X
+  X,
+  FileText,
+  Paperclip
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { Button, Modal } from './UIComponents';
@@ -59,7 +61,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setIntegrationConfig,
   onExit
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'agenda' | 'tasks' | 'budget' | 'website'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'agenda' | 'tasks' | 'budget' | 'files' | 'website'>('overview');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [chatInput, setChatInput] = useState('');
   const [showCode, setShowCode] = useState(false);
   const [lastRegistrant, setLastRegistrant] = useState<string | null>(null);
@@ -88,37 +92,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
           if (integrationConfig.type === 'bigmarker' && integrationConfig.platformId) {
             const settings = await getAdminSettings();
             if (settings.bigmarkerApiKey) {
-               try {
-                  const fullName = payload.name || '';
-                  const firstSpace = fullName.indexOf(' ');
-                  const firstName = firstSpace === -1 ? fullName : fullName.substring(0, firstSpace);
-                  const lastName = firstSpace === -1 ? '.' : fullName.substring(firstSpace + 1);
-                  
-                  // Filter payload for custom fields (exclude known keys)
-                  const customFieldsPayload: Record<string, any> = {};
-                  Object.keys(payload).forEach(key => {
-                    if (!['name', 'email', 'first_name', 'last_name'].includes(key)) {
-                        customFieldsPayload[key] = payload[key];
-                    }
-                  });
+              try {
+                const fullName = payload.name || '';
+                const firstSpace = fullName.indexOf(' ');
+                const firstName = firstSpace === -1 ? fullName : fullName.substring(0, firstSpace);
+                const lastName = firstSpace === -1 ? '.' : fullName.substring(firstSpace + 1);
 
-                  await fetch(getApiUrl(`/api/bigmarker/api/v1/conferences/${integrationConfig.platformId}/register`), {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'API-KEY': settings.bigmarkerApiKey
-                    },
-                    body: JSON.stringify({
-                      email: payload.email,
-                      first_name: firstName,
-                      last_name: lastName,
-                      custom_fields: customFieldsPayload
-                    })
-                  });
-                  console.log('Registered to BigMarker via Dashboard proxy');
-               } catch (bmError) {
-                 console.error('Failed to register to BigMarker via Dashboard:', bmError);
-               }
+                // Filter payload for custom fields (exclude known keys)
+                const customFieldsPayload: Record<string, any> = {};
+                Object.keys(payload).forEach(key => {
+                  if (!['name', 'email', 'first_name', 'last_name'].includes(key)) {
+                    customFieldsPayload[key] = payload[key];
+                  }
+                });
+
+                await fetch(getApiUrl(`/api/bigmarker/api/v1/conferences/${integrationConfig.platformId}/register`), {
+                  method: 'PUT',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'API-KEY': settings.bigmarkerApiKey
+                  },
+                  body: JSON.stringify({
+                    email: payload.email,
+                    first_name: firstName,
+                    last_name: lastName,
+                    custom_fields: customFieldsPayload
+                  })
+                });
+                console.log('Registered to BigMarker via Dashboard proxy');
+              } catch (bmError) {
+                console.error('Failed to register to BigMarker via Dashboard:', bmError);
+              }
             }
           }
         }
@@ -306,7 +310,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       if (!response.ok) {
         const errorText = await response.text();
         if (response.status === 404 && errorText.includes("File not found")) {
-             throw new Error(`BigMarker API error (404): Conference ID not found or proxy connection failed.`);
+          throw new Error(`BigMarker API error (404): Conference ID not found or proxy connection failed.`);
         }
         throw new Error(`BigMarker API error (${response.status}): ${errorText}`);
       }
@@ -409,6 +413,127 @@ export const Dashboard: React.FC<DashboardProps> = ({
     element.click();
     document.body.removeChild(element);
   };
+
+  // --- File Handler ---
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch(getApiUrl(`/api/events/${eventPlan.id}/files`), {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) throw new Error('Upload failed');
+
+      const newFile = await res.json();
+      onManualUpdate({
+        ...eventPlan,
+        files: [...(eventPlan.files || []), newFile]
+      });
+    } catch (error) {
+      console.error(error);
+      alert('Failed to upload file');
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!confirm('Are you sure you want to delete this file?')) return;
+
+    try {
+      await fetch(getApiUrl(`/api/events/${eventPlan.id}/files/${fileId}`), {
+        method: 'DELETE'
+      });
+
+      onManualUpdate({
+        ...eventPlan,
+        files: (eventPlan.files || []).filter(f => f.id !== fileId)
+      });
+    } catch (error) {
+      alert('Failed to delete file');
+    }
+  };
+
+  const renderFiles = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-fadeIn">
+      <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-slate-800">Event Files</h3>
+        {isEditing && (
+          <div>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {isUploading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              Upload File
+            </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </div>
+        )}
+      </div>
+
+      {eventPlan.files && eventPlan.files.length > 0 ? (
+        <div className="divide-y divide-slate-100">
+          {eventPlan.files.map((file) => (
+            <div key={file.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors group">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <a href={getApiUrl(file.url)} target="_blank" rel="noreferrer" className="font-medium text-slate-900 hover:text-indigo-600 transition-colors">
+                    {file.name}
+                  </a>
+                  <p className="text-xs text-slate-500">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB • {new Date(file.uploadedAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={getApiUrl(file.url)}
+                  download
+                  className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100"
+                  title="Download"
+                >
+                  <Download className="w-4 h-4" />
+                </a>
+                {isEditing && (
+                  <button
+                    onClick={() => handleDeleteFile(file.id)}
+                    className="p-2 text-slate-400 hover:text-red-500 rounded-full hover:bg-red-50"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="p-12 text-center text-slate-400">
+          <Paperclip className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p>No files uploaded yet.</p>
+        </div>
+      )}
+    </div>
+  );
 
   const renderOverview = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fadeIn">
@@ -1268,6 +1393,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Budget
           </button>
           <button
+            onClick={() => setActiveTab('files')}
+            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'files' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <Paperclip className="w-5 h-5" />
+            Files
+          </button>
+          <button
             onClick={() => setActiveTab('website')}
             className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'website' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
@@ -1337,6 +1469,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {activeTab === 'agenda' && renderAgenda()}
             {activeTab === 'tasks' && renderTasks()}
             {activeTab === 'budget' && renderBudget()}
+            {activeTab === 'files' && renderFiles()}
             {activeTab === 'website' && renderWebsite()}
           </div>
         </div>
