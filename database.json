@@ -2,12 +2,155 @@
   "bigMarkerApiKey": "",
   "zoomApiKey": "",
   "vimeoApiKey": "",
-  "geminiApiKey": "",
+  "geminiApiKey": "79bc0aaa63e3ab69b1465d2f:199aebf353374d404a1a010681e61980:f895e660509dae0096cb9cf478b7173ae1c034d97c61815486d00310023258a7c75cb271e5f553",
   "defaultProxyUrl": "/api/bigmarker",
   "smtpHost": "",
   "smtpPort": "",
   "smtpUser": "",
   "smtpPass": "",
   "smtpFrom": "",
-  "events": []
+  "events": [
+    {
+      "title": "A Virtual Italian Feast: Celebrating 50 Years of Family & Love",
+      "description": "Join us for a heartwarming virtual dinner party celebrating a special 50th birthday with an Italian flair! This interactive webinar brings family together for an evening of stories, laughter, and delicious virtual treats.",
+      "theme": "Virtual Italian Dinner Party",
+      "imageKeyword": "pasta",
+      "speakers": [
+        {
+          "id": "spk1",
+          "name": "Sofia Rossi",
+          "role": "Family Historian & Storyteller",
+          "bio": "Sofia is passionate about preserving family memories and sharing heartwarming stories across generations."
+        },
+        {
+          "id": "spk2",
+          "name": "Marco Bellini",
+          "role": "Italian Culture Expert",
+          "bio": "Marco brings a wealth of knowledge about Italian traditions, cuisine, and cultural nuances to enhance our celebration."
+        },
+        {
+          "id": "spk3",
+          "name": "Ava Chen",
+          "role": "Virtual Event Tech Specialist",
+          "bio": "Ava is our go-to expert for ensuring a seamless and engaging virtual experience for all attendees."
+        }
+      ],
+      "agenda": [
+        {
+          "id": "ag1",
+          "time": "5:00 PM",
+          "title": "Welcome & Virtual Aperitivo",
+          "description": "Kick off the celebration with a warm welcome and a toast to the birthday honoree! Share your favorite virtual cocktail or appetizer.",
+          "durationMinutes": 20,
+          "type": "keynote",
+          "imageKeyword": "cocktail"
+        },
+        {
+          "id": "ag2",
+          "time": "5:20 PM",
+          "title": "Family History Spotlight: A Journey Through the Years",
+          "description": "Sofia Rossi takes us on a nostalgic journey through family history, sharing cherished memories and photos.",
+          "durationMinutes": 30,
+          "type": "keynote",
+          "imageKeyword": "family"
+        },
+        {
+          "id": "ag3",
+          "time": "5:50 PM",
+          "title": "Interactive Poll: Favorite Family Memory",
+          "description": "Engage attendees with a fun poll to capture their favorite family memories. Share the results and spark conversation.",
+          "durationMinutes": 10,
+          "type": "break",
+          "imageKeyword": "ballot"
+        },
+        {
+          "id": "ag4",
+          "time": "6:00 PM",
+          "title": "Italian Culture & Cuisine: A Taste of Italy",
+          "description": "Marco Bellini shares insights into Italian culture, traditions, and the significance of food in Italian celebrations.",
+          "durationMinutes": 25,
+          "type": "keynote",
+          "imageKeyword": "italy"
+        },
+        {
+          "id": "ag5",
+          "time": "6:25 PM",
+          "title": "Virtual Dinner & Story Sharing",
+          "description": "Enjoy your virtual Italian dinner together! Share stories, laughter, and birthday wishes.",
+          "durationMinutes": 45,
+          "type": "networking",
+          "imageKeyword": "dinner"
+        },
+        {
+          "id": "ag6",
+          "time": "7:10 PM",
+          "title": "Birthday Toast & Closing Remarks",
+          "description": "Raise your glasses for a final toast to the birthday honoree and wrap up the virtual celebration.",
+          "durationMinutes": 10,
+          "type": "keynote",
+          "imageKeyword": "toast"
+        }
+      ],
+      "tasks": [
+        {
+          "id": "task1",
+          "title": "Webinar Platform Setup (Zoom/Bigmarker)",
+          "status": "pending",
+          "priority": "high"
+        },
+        {
+          "id": "task2",
+          "title": "Speaker Tech Check & Lighting Setup",
+          "status": "in-progress",
+          "priority": "high"
+        },
+        {
+          "id": "task3",
+          "title": "Create & Schedule Email Sequence (Invitations, Reminders)",
+          "status": "pending",
+          "priority": "medium"
+        },
+        {
+          "id": "task4",
+          "title": "Design Interactive Poll Questions",
+          "status": "completed",
+          "priority": "medium"
+        },
+        {
+          "id": "task5",
+          "title": "Rehearse Webinar Flow with Speakers",
+          "status": "pending",
+          "priority": "high"
+        }
+      ],
+      "budget": {
+        "totalBudget": 1500,
+        "currency": "USD",
+        "items": [
+          {
+            "amount": 500,
+            "category": "Software",
+            "label": "Streaming Software (Zoom Webinar License)"
+          },
+          {
+            "amount": 600,
+            "category": "Marketing",
+            "label": "Digital Ads (Social Media Promotion)"
+          },
+          {
+            "amount": 400,
+            "category": "Speakers",
+            "label": "Speaker Fees/Honorariums"
+          }
+        ]
+      },
+      "marketingTagline": "Mangia, Prega, Ama: Celebrate 50 Years of Love, Italian Style!",
+      "date": "October 27, 2024",
+      "estimatedAttendees": 30,
+      "location": "Zoom Webinar Platform",
+      "targetAudience": "Family members and close friends",
+      "id": "mixm2yymvblxtmash",
+      "createdAt": 1765226166142
+    }
+  ]
 }

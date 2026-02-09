@@ -46,6 +46,17 @@ export interface Registrant {
   customData?: Record<string, string>; // To store extra fields from BigMarker forms
 }
 
+export interface UploadedAsset {
+  id: string;
+  name: string;
+  kind: 'agenda' | 'deck';
+  source: 'upload' | 'link' | 'paste' | 'ai';
+  mimeType?: string;
+  sizeBytes?: number;
+  url?: string;
+  createdAt: number;
+}
+
 export interface EventPlan {
   id: string;
   createdAt: number;
@@ -66,6 +77,10 @@ export interface EventPlan {
   marketingTagline: string;
   websiteHtml?: string;
   integrationConfig?: IntegrationConfig;
+  agendaSourceText?: string;
+  brandPalette?: string[];
+  uploadedDeckName?: string;
+  uploadedFiles?: UploadedAsset[];
   registrants?: Registrant[];
   pageViews?: number;
 }
@@ -90,21 +105,51 @@ export interface IntegrationConfig {
 
 export interface AdminSettings {
   zoomApiKey?: string;
-  bigmarkerApiKey?: string;
+  zoomAccountId?: string;
+  zoomClientId?: string;
+  zoomClientSecret?: string;
+  bigMarkerApiKey?: string;
+  bigMarkerChannelId?: string;
+  vimeoApiKey?: string;
+  geminiApiKey?: string;
   sendgridApiKey?: string;
   smtpHost?: string;
+  smtpPort?: string;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpFrom?: string;
+  smtp2goApiKey?: string;
+  smtp2goFrom?: string;
+  defaultProxyUrl?: string;
+  hasGeminiKey?: boolean;
+  hasBigMarkerKey?: boolean;
+  hasBigMarkerChannelId?: boolean;
+  hasZoomKey?: boolean;
+  hasZoomAccountId?: boolean;
+  hasZoomClientId?: boolean;
+  hasZoomClientSecret?: boolean;
+  hasVimeoKey?: boolean;
+  hasSmtpPass?: boolean;
+  hasSmtp2goKey?: boolean;
+  activeEmailRelay?: 'smtp2go' | 'smtp' | 'none';
 }
 
 export interface SystemConfig {
   geminiApiKey: string;
   bigMarkerApiKey: string;
+  bigMarkerChannelId: string;
   zoomApiKey: string;
+  zoomAccountId: string;
+  zoomClientId: string;
+  zoomClientSecret: string;
   vimeoApiKey: string;
   smtpHost: string;
   smtpPort: string;
   smtpUser: string;
   smtpPass: string;
   smtpFrom: string;
+  smtp2goApiKey: string;
+  smtp2goFrom: string;
 }
 
 export enum AppState {

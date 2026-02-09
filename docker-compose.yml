@@ -1,0 +1,21 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: eventbuilder-ai:local
+    container_name: eventbuilder-ai
+    env_file:
+      - .env.docker
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DB_PATH: /data/database.sqlite
+    volumes:
+      - eventbuilder_data:/data
+    restart: unless-stopped
+
+volumes:
+  eventbuilder_data:

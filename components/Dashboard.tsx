@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { EventPlan, IntegrationConfig, Speaker, FormField, AgendaItem, Task, EventBudget } from '../types';
-import { addRegistrant, getAdminSettings } from '../services/storageService';
-import { getApiUrl } from '../services/config';
+import { addRegistrant, getAdminSettings, saveAdminSettings } from '../services/storageService';
+import { getApiAuthHeaders, getApiUrl } from '../services/config';
 import {
   Calendar,
   CheckSquare,
@@ -29,7 +29,10 @@ import {
   Trash2,
   Plus,
   Save,
-  X
+  X,
+  Key,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { Button, Modal } from './UIComponents';
@@ -39,7 +42,7 @@ interface DashboardProps {
   onUpdate: (instruction: string) => void;
   onManualUpdate: (plan: EventPlan) => void;
   isUpdating: boolean;
-  onGenerateWebsite: () => void;
+  onGenerateWebsite: (overrideConfig?: IntegrationConfig) => void;
   isGeneratingWebsite: boolean;
   integrationConfig: IntegrationConfig;
   setIntegrationConfig: (config: IntegrationConfig) => void;
@@ -59,7 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setIntegrationConfig,
   onExit
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'agenda' | 'tasks' | 'budget' | 'website'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'agenda' | 'tasks' | 'budget' | 'files' | 'website' | 'registrants'>('overview');
   const [chatInput, setChatInput] = useState('');
   const [showCode, setShowCode] = useState(false);
   const [lastRegistrant, setLastRegistrant] = useState<string | null>(null);
@@ -68,10 +71,71 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isEditingHtml, setIsEditingHtml] = useState(false);
   const [editedHtml, setEditedHtml] = useState(eventPlan.websiteHtml || '');
   const [showIntegrationSettings, setShowIntegrationSettings] = useState(false);
+  const [bigMarkerApiKey, setBigMarkerApiKey] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isEditingLandingDetails, setIsEditingLandingDetails] = useState(false);
+  const [landingDraft, setLandingDraft] = useState({
+    title: eventPlan.title || '',
+    marketingTagline: eventPlan.marketingTagline || '',
+    description: eventPlan.description || '',
+    date: eventPlan.date || '',
+    location: eventPlan.location || ''
+  });
+  const [liveRegistrants, setLiveRegistrants] = useState(eventPlan.registrants || []);
+  const [zoomMeetingDetails, setZoomMeetingDetails] = useState<null | {
+    id: string | number;
+    topic?: string;
+    host_id?: string;
+    start_time?: string;
+    duration?: number;
+    timezone?: string;
+    join_url?: string;
+    start_url?: string;
+    registration_url?: string;
+    status?: string;
+  }>(null);
+  const [isSyncingZoomDetails, setIsSyncingZoomDetails] = useState(false);
+  const [bigMarkerConferenceDetails, setBigMarkerConferenceDetails] = useState<null | {
+    id: string | number;
+    title?: string;
+    status?: string;
+    starts_at?: string;
+    timezone?: string;
+    webinar_url?: string;
+    registration_url?: string;
+    host_name?: string;
+  }>(null);
+  const [isSyncingBigMarkerDetails, setIsSyncingBigMarkerDetails] = useState(false);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  // Load admin settings on mount to check for API keys
+  useEffect(() => {
+    const loadSettings = async () => {
+      const settings = await getAdminSettings();
+      if (settings.hasBigMarkerKey) {
+        showToast('Stored BigMarker API key is configured on server.', 'success');
+      }
+    };
+    loadSettings();
+  }, []);
 
   // Refs for file inputs
   const headerInputRef = useRef<HTMLInputElement>(null);
   const speakerInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+
+  // Listen for registration events from the iframe website
+  useEffect(() => {
+    setLiveRegistrants(eventPlan.registrants || []);
+  }, [eventPlan.id, eventPlan.registrants]);
+
+  useEffect(() => {
+    setZoomMeetingDetails(null);
+    setBigMarkerConferenceDetails(null);
+  }, [eventPlan.id, integrationConfig.type, integrationConfig.platformId]);
 
   // Listen for registration events from the iframe website
   useEffect(() => {
@@ -80,46 +144,111 @@ export const Dashboard: React.FC<DashboardProps> = ({
         const { eventId, payload } = event.data;
         if (eventId === eventPlan.id) {
           console.log('Received registration via iframe:', payload);
-          await addRegistrant(eventId, payload);
+          const postResultToIframe = (body: Record<string, unknown>) => {
+            try {
+              if (event.source && typeof (event.source as WindowProxy).postMessage === 'function') {
+                (event.source as WindowProxy).postMessage({
+                  type: 'EVENT_REGISTRATION_RESULT',
+                  eventId: eventPlan.id,
+                  ...body
+                }, '*');
+              }
+            } catch (e) {
+              console.warn('Unable to post registration result back to iframe', e);
+            }
+          };
+          try {
+            const result = await addRegistrant(eventId, payload);
+            postResultToIframe({
+              success: true,
+              registration: result?.registration || null
+            });
+            if (!result?.duplicate) {
+              if (integrationConfig.type === 'bigmarker' && integrationConfig.platformId) {
+                showToast('Registrant synced to BigMarker successfully.', 'success');
+              }
+            }
+          } catch (registerError: any) {
+            const errorMessage = registerError?.message || 'Failed to save registration.';
+            postResultToIframe({
+              success: false,
+              error: errorMessage
+            });
+            showToast(errorMessage, 'error');
+            return;
+          }
+          setLiveRegistrants((prev) => {
+            const email = String(payload.email || '').trim().toLowerCase();
+            if (!email) return prev;
+            const exists = prev.some((r) => String(r.email || '').trim().toLowerCase() === email);
+            if (exists) return prev;
+            return [
+              {
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                name: String(payload.name || `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || 'Unknown'),
+                email: String(payload.email || '').trim(),
+                company: String(payload.company || '').trim() || undefined,
+                registeredAt: Date.now()
+              },
+              ...prev
+            ];
+          });
           setLastRegistrant(payload.name);
           setTimeout(() => setLastRegistrant(null), 5000);
 
-          // Relay registration to BigMarker if configured
-          if (integrationConfig.type === 'bigmarker' && integrationConfig.platformId) {
-            const settings = await getAdminSettings();
-            if (settings.bigmarkerApiKey) {
-               try {
-                  const fullName = payload.name || '';
-                  const firstSpace = fullName.indexOf(' ');
-                  const firstName = firstSpace === -1 ? fullName : fullName.substring(0, firstSpace);
-                  const lastName = firstSpace === -1 ? '.' : fullName.substring(firstSpace + 1);
-                  
-                  // Filter payload for custom fields (exclude known keys)
-                  const customFieldsPayload: Record<string, any> = {};
-                  Object.keys(payload).forEach(key => {
-                    if (!['name', 'email', 'first_name', 'last_name'].includes(key)) {
-                        customFieldsPayload[key] = payload[key];
-                    }
-                  });
-
-                  await fetch(getApiUrl(`/api/bigmarker/api/v1/conferences/${integrationConfig.platformId}/register`), {
-                    method: 'PUT',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'API-KEY': settings.bigmarkerApiKey
-                    },
-                    body: JSON.stringify({
-                      email: payload.email,
-                      first_name: firstName,
-                      last_name: lastName,
-                      custom_fields: customFieldsPayload
+          if (integrationConfig.type === 'zoom' && integrationConfig.platformId) {
+            try {
+              const fullName = String(payload.name || '').trim();
+              const firstSpace = fullName.indexOf(' ');
+              const firstName = payload.first_name || (firstSpace === -1 ? fullName : fullName.substring(0, firstSpace));
+              const lastName = payload.last_name || (firstSpace === -1 ? '.' : fullName.substring(firstSpace + 1));
+              const customQuestions = Array.isArray(integrationConfig.customFields)
+                ? integrationConfig.customFields
+                    .filter((field) => !['email', 'first_name', 'last_name', 'name', 'full_name'].includes(field.id.toLowerCase()))
+                    .map((field) => {
+                      const raw = payload[field.id];
+                      if (raw === undefined || raw === null || String(raw).trim() === '') {
+                        return null;
+                      }
+                      return {
+                        title: field.label,
+                        value: String(raw).trim()
+                      };
                     })
-                  });
-                  console.log('Registered to BigMarker via Dashboard proxy');
-               } catch (bmError) {
-                 console.error('Failed to register to BigMarker via Dashboard:', bmError);
-               }
+                    .filter(Boolean)
+                : [];
+
+              const zoomResp = await fetch(
+                getApiUrl(`/api/zoom/meetings/${encodeURIComponent(String(integrationConfig.platformId))}/registrants`),
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...getApiAuthHeaders()
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify({
+                    email: payload.email,
+                    first_name: firstName || '.',
+                    last_name: lastName || '.',
+                    custom_questions: customQuestions
+                  })
+                }
+              );
+              if (!zoomResp.ok) {
+                const errText = await zoomResp.text();
+                console.error('Failed to register to Zoom via Dashboard:', errText);
+                showToast(`Zoom registration failed: ${errText.slice(0, 180)}`, 'error');
+              } else {
+                console.log('Registered to Zoom meeting via Dashboard proxy');
+                showToast('Registrant synced to Zoom successfully.', 'success');
+              }
+            } catch (zoomError) {
+              console.error('Failed to register to Zoom via Dashboard:', zoomError);
+              showToast('Zoom registration failed. Check meeting registration settings.', 'error');
             }
+          } else if (integrationConfig.type === 'zoom' && !integrationConfig.platformId) {
+            showToast('Zoom meeting ID is missing. Registrant saved locally only.', 'error');
           }
         }
       }
@@ -133,6 +262,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     setEditedHtml(eventPlan.websiteHtml || '');
   }, [eventPlan.websiteHtml]);
+
+  useEffect(() => {
+    setLandingDraft({
+      title: eventPlan.title || '',
+      marketingTagline: eventPlan.marketingTagline || '',
+      description: eventPlan.description || '',
+      date: eventPlan.date || '',
+      location: eventPlan.location || ''
+    });
+    setIsEditingLandingDetails(false);
+  }, [eventPlan.id, eventPlan.title, eventPlan.marketingTagline, eventPlan.description, eventPlan.date, eventPlan.location]);
 
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -290,23 +430,35 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // --- BigMarker Field Sync ---
 
-  const handleSyncBigMarkerFields = async () => {
+  const handleSyncBigMarkerFields = async (): Promise<FormField[]> => {
     if (!integrationConfig.platformId) {
       alert("Please enter a Conference ID first.");
-      return;
+      return [];
     }
 
     setIsSyncingFields(true);
 
+    // Auto-save API Key if provided
+    if (bigMarkerApiKey) {
+      try {
+        const currentSettings = await getAdminSettings();
+        await saveAdminSettings({ ...currentSettings, bigMarkerApiKey: bigMarkerApiKey });
+      } catch (e) {
+        console.error("Failed to auto-save BigMarker key", e);
+      }
+    }
+
     try {
-      // Use the standard Conference Detail endpoint which typically contains the custom_fields array
-      // Proxy path: /api/bigmarker/api/v1/conferences/{id} -> https://www.bigmarker.com/api/v1/conferences/{id}
-      const response = await fetch(getApiUrl(`/api/bigmarker/api/v1/conferences/${integrationConfig.platformId}`));
+      // Use the dedicated Custom Fields endpoint to get correct field definitions
+      // Proxy path: /api/bigmarker/api/v1/conferences/custom_fields/{id}
+      const response = await fetch(getApiUrl(`/api/bigmarker/api/v1/conferences/custom_fields/${integrationConfig.platformId}`), {
+        headers: getApiAuthHeaders()
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
         if (response.status === 404 && errorText.includes("File not found")) {
-             throw new Error(`BigMarker API error (404): Conference ID not found or proxy connection failed.`);
+          throw new Error(`BigMarker API error (404): Conference ID not found or proxy connection failed.`);
         }
         throw new Error(`BigMarker API error (${response.status}): ${errorText}`);
       }
@@ -342,22 +494,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
         };
       });
 
-      // Add default fields if none were returned (email is typically required)
-      if (customFields.length === 0) {
-        customFields.push(
-          { id: 'email', label: 'Email Address', type: 'email', required: true },
-          { id: 'first_name', label: 'First Name', type: 'text', required: false },
-          { id: 'last_name', label: 'Last Name', type: 'text', required: false }
-        );
-      }
+      // Filter out mapped fields that conflict with our mandatory standard fields
+      // We want to enforce: "Full Name" and "Email Address" as the primary fields.
+      const filteredMappedFields = customFields.filter(f => {
+        const id = f.id.toLowerCase();
+        return !['email', 'first_name', 'last_name', 'full_name', 'name'].includes(id);
+      });
+
+      // Always prepend the standard mandatory fields
+      const finalFields: FormField[] = [
+        { id: 'full_name', label: 'Full Name', type: 'text', required: true },
+        { id: 'email', label: 'Email Address', type: 'email', required: true },
+        ...filteredMappedFields
+      ];
 
       setIntegrationConfig({
         ...integrationConfig,
-        customFields: customFields
+        customFields: finalFields
       });
 
       setIsSyncingFields(false);
-      alert(`Successfully synced ${customFields.length} custom field${customFields.length !== 1 ? 's' : ''} from BigMarker!`);
+      console.log('BigMarker Sync Success. Final Fields:', finalFields);
+      showToast(`Successfully synced ${finalFields.length} fields (including standard fields) from BigMarker!`, 'success');
+      return finalFields;
     } catch (error: any) {
       console.error('BigMarker sync error:', error);
       setIsSyncingFields(false);
@@ -373,8 +532,114 @@ export const Dashboard: React.FC<DashboardProps> = ({
         errorMessage = `Error: ${error.message}`;
       }
 
-      alert(errorMessage);
+      showToast(errorMessage, 'error');
+      return [];
     }
+  };
+
+  const handleSyncZoomFields = async (): Promise<FormField[]> => {
+    const meetingId = String(integrationConfig.platformId || '').trim();
+    if (!meetingId) {
+      alert('Please enter a Zoom Meeting/Webinar ID first.');
+      return [];
+    }
+
+    setIsSyncingFields(true);
+    try {
+      const response = await fetch(
+        getApiUrl(`/api/zoom/meetings/${encodeURIComponent(meetingId)}/registration-fields`),
+        {
+          credentials: 'include',
+          headers: { ...getApiAuthHeaders() }
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || `Zoom field sync failed (${response.status})`);
+      }
+
+      const standardQuestions = Array.isArray(body.questions) ? body.questions : [];
+      const customQuestions = Array.isArray(body.custom_questions) ? body.custom_questions : [];
+      const fields: FormField[] = [];
+
+      const pushUnique = (field: FormField) => {
+        if (!field.id) return;
+        if (fields.some((f) => f.id.toLowerCase() === field.id.toLowerCase())) return;
+        fields.push(field);
+      };
+
+      const mapZoomFieldType = (value: string): 'text' | 'email' | 'checkbox' | 'select' => {
+        const normalized = String(value || '').toLowerCase();
+        if (normalized.includes('email')) return 'email';
+        if (normalized.includes('single_radio') || normalized.includes('single') || normalized.includes('dropdown')) return 'select';
+        if (normalized.includes('checkbox') || normalized.includes('multiple')) return 'checkbox';
+        return 'text';
+      };
+
+      for (const q of standardQuestions) {
+        const fieldName = String(q?.field_name || '').trim();
+        if (!fieldName) continue;
+        const id = fieldName.toLowerCase();
+        const label = fieldName
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (ch) => ch.toUpperCase());
+        pushUnique({
+          id,
+          label,
+          type: mapZoomFieldType(String(q?.type || q?.field_type || 'text')),
+          required: Boolean(q?.required)
+        });
+      }
+
+      for (const q of customQuestions) {
+        const title = String(q?.title || '').trim();
+        if (!title) continue;
+        const normalizedId = `custom_${title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'field'}`;
+        const answers = Array.isArray(q?.answers) ? q.answers.map((a: any) => String(a || '').trim()).filter(Boolean) : [];
+        pushUnique({
+          id: normalizedId,
+          label: title,
+          type: answers.length > 0 ? 'select' : 'text',
+          required: Boolean(q?.required),
+          options: answers.length > 0 ? answers : undefined
+        });
+      }
+
+      // Ensure primary identity fields are always present
+      pushUnique({ id: 'first_name', label: 'First Name', type: 'text', required: true });
+      pushUnique({ id: 'last_name', label: 'Last Name', type: 'text', required: true });
+      pushUnique({ id: 'email', label: 'Email Address', type: 'email', required: true });
+
+      // Move identity fields to top in fixed order
+      const preferredOrder = ['first_name', 'last_name', 'email'];
+      const ordered = [
+        ...preferredOrder.map((id) => fields.find((f) => f.id.toLowerCase() === id)).filter(Boolean) as FormField[],
+        ...fields.filter((f) => !preferredOrder.includes(f.id.toLowerCase()))
+      ];
+
+      setIntegrationConfig({
+        ...integrationConfig,
+        customFields: ordered
+      });
+      showToast(`Successfully synced ${ordered.length} Zoom registration fields.`, 'success');
+      return ordered;
+    } catch (error: any) {
+      const message = error?.message || 'Failed to sync Zoom fields.';
+      showToast(message, 'error');
+      return [];
+    } finally {
+      setIsSyncingFields(false);
+    }
+  };
+
+  const syncProviderFields = async (): Promise<FormField[] | null> => {
+    if (integrationConfig.type === 'bigmarker') {
+      return await handleSyncBigMarkerFields();
+    }
+    if (integrationConfig.type === 'zoom') {
+      return await handleSyncZoomFields();
+    }
+    return null;
   };
 
   const handleSaveHtml = () => {
@@ -382,13 +647,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
     setIsEditingHtml(false);
   };
 
+  const handleSaveLandingDetails = () => {
+    const updatedPlan: EventPlan = {
+      ...eventPlan,
+      title: (landingDraft.title || '').trim() || eventPlan.title,
+      marketingTagline: (landingDraft.marketingTagline || '').trim() || eventPlan.marketingTagline,
+      description: (landingDraft.description || '').trim() || eventPlan.description,
+      date: (landingDraft.date || '').trim() || eventPlan.date,
+      location: (landingDraft.location || '').trim() || eventPlan.location
+    };
+    onManualUpdate(updatedPlan);
+    setIsEditingLandingDetails(false);
+    onGenerateWebsite();
+  };
+
+  const handleCancelLandingDetails = () => {
+    setLandingDraft({
+      title: eventPlan.title || '',
+      marketingTagline: eventPlan.marketingTagline || '',
+      description: eventPlan.description || '',
+      date: eventPlan.date || '',
+      location: eventPlan.location || ''
+    });
+    setIsEditingLandingDetails(false);
+  };
+
   // State for Regenerate confirmation modal
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
 
   const openRegenerateConfirm = () => setShowRegenerateConfirm(true);
 
-  const confirmRegenerate = () => {
-    onGenerateWebsite();
+  const confirmRegenerate = async () => {
+    const synced = await syncProviderFields();
+    const nextConfig = Array.isArray(synced)
+      ? { ...integrationConfig, customFields: synced }
+      : integrationConfig;
+    onGenerateWebsite(nextConfig);
     setShowIntegrationSettings(false);
     setShowRegenerateConfirm(false);
   };
@@ -911,6 +1205,145 @@ export const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 
+  const handleSyncZoomMeetingDetails = async () => {
+    if (integrationConfig.type !== 'zoom') return;
+    const meetingId = String(integrationConfig.platformId || '').trim();
+    if (!meetingId) {
+      showToast('Zoom meeting ID is required before sync.', 'error');
+      return;
+    }
+
+    setIsSyncingZoomDetails(true);
+    try {
+      const response = await fetch(
+        getApiUrl(`/api/zoom/meetings/${encodeURIComponent(meetingId)}/details`),
+        {
+          method: 'GET',
+          headers: {
+            ...getApiAuthHeaders()
+          },
+          credentials: 'include'
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || `Failed to sync Zoom meeting (${response.status})`);
+      }
+      setZoomMeetingDetails(body);
+      showToast('Zoom meeting details synced.', 'success');
+    } catch (error: any) {
+      showToast(error?.message || 'Failed to sync Zoom meeting details.', 'error');
+    } finally {
+      setIsSyncingZoomDetails(false);
+    }
+  };
+
+  const renderZoomMeetingDetailsCard = () => {
+    if (integrationConfig.type !== 'zoom') return null;
+    const meetingId = String(integrationConfig.platformId || '').trim();
+    return (
+      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-bold text-slate-700">Zoom Sync</h4>
+          <button
+            type="button"
+            onClick={handleSyncZoomMeetingDetails}
+            disabled={isSyncingZoomDetails || !meetingId}
+            className="text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2 py-1 rounded border border-indigo-200 disabled:opacity-50"
+          >
+            {isSyncingZoomDetails ? 'Syncing...' : 'Sync via API'}
+          </button>
+        </div>
+        <p className="text-xs text-slate-600">
+          Meeting ID: <span className="font-mono">{meetingId || 'Missing'}</span>
+        </p>
+        {zoomMeetingDetails ? (
+          <div className="space-y-1 text-xs text-slate-600 break-all">
+            <p>Topic: <span className="font-medium text-slate-800">{zoomMeetingDetails.topic || 'N/A'}</span></p>
+            <p>Status: <span className="font-medium text-slate-800">{zoomMeetingDetails.status || 'N/A'}</span></p>
+            <p>Start Time: <span className="font-medium text-slate-800">{zoomMeetingDetails.start_time || 'N/A'}</span></p>
+            <p>Duration: <span className="font-medium text-slate-800">{zoomMeetingDetails.duration || 0} min</span></p>
+            <p>Timezone: <span className="font-medium text-slate-800">{zoomMeetingDetails.timezone || 'N/A'}</span></p>
+            <p>Host ID: <span className="font-mono text-slate-800">{zoomMeetingDetails.host_id || 'N/A'}</span></p>
+            <p>Join URL: <a className="text-indigo-600 underline" href={zoomMeetingDetails.join_url} target="_blank" rel="noreferrer">{zoomMeetingDetails.join_url || 'N/A'}</a></p>
+            <p>Start URL (login): <a className="text-indigo-600 underline" href={zoomMeetingDetails.start_url} target="_blank" rel="noreferrer">{zoomMeetingDetails.start_url || 'N/A'}</a></p>
+            <p>Registration URL: <a className="text-indigo-600 underline" href={zoomMeetingDetails.registration_url} target="_blank" rel="noreferrer">{zoomMeetingDetails.registration_url || 'N/A'}</a></p>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">No synced Zoom meeting details yet.</p>
+        )}
+      </div>
+    );
+  };
+
+  const handleSyncBigMarkerConferenceDetails = async () => {
+    if (integrationConfig.type !== 'bigmarker') return;
+    const conferenceId = String(integrationConfig.platformId || '').trim();
+    if (!conferenceId) {
+      showToast('BigMarker conference ID is required before sync.', 'error');
+      return;
+    }
+    setIsSyncingBigMarkerDetails(true);
+    try {
+      const response = await fetch(
+        getApiUrl(`/api/bigmarker/conferences/${encodeURIComponent(conferenceId)}/details`),
+        {
+          method: 'GET',
+          headers: {
+            ...getApiAuthHeaders()
+          },
+          credentials: 'include'
+        }
+      );
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body?.error || `Failed to sync BigMarker conference (${response.status})`);
+      }
+      setBigMarkerConferenceDetails(body);
+      showToast('BigMarker conference details synced.', 'success');
+    } catch (error: any) {
+      showToast(error?.message || 'Failed to sync BigMarker conference details.', 'error');
+    } finally {
+      setIsSyncingBigMarkerDetails(false);
+    }
+  };
+
+  const renderBigMarkerConferenceDetailsCard = () => {
+    if (integrationConfig.type !== 'bigmarker') return null;
+    const conferenceId = String(integrationConfig.platformId || '').trim();
+    return (
+      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-bold text-slate-700">BigMarker Sync</h4>
+          <button
+            type="button"
+            onClick={handleSyncBigMarkerConferenceDetails}
+            disabled={isSyncingBigMarkerDetails || !conferenceId}
+            className="text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-2 py-1 rounded border border-indigo-200 disabled:opacity-50"
+          >
+            {isSyncingBigMarkerDetails ? 'Syncing...' : 'Sync via API'}
+          </button>
+        </div>
+        <p className="text-xs text-slate-600">
+          Conference ID: <span className="font-mono">{conferenceId || 'Missing'}</span>
+        </p>
+        {bigMarkerConferenceDetails ? (
+          <div className="space-y-1 text-xs text-slate-600 break-all">
+            <p>Title: <span className="font-medium text-slate-800">{bigMarkerConferenceDetails.title || 'N/A'}</span></p>
+            <p>Status: <span className="font-medium text-slate-800">{bigMarkerConferenceDetails.status || 'N/A'}</span></p>
+            <p>Start Time: <span className="font-medium text-slate-800">{bigMarkerConferenceDetails.starts_at || 'N/A'}</span></p>
+            <p>Timezone: <span className="font-medium text-slate-800">{bigMarkerConferenceDetails.timezone || 'N/A'}</span></p>
+            <p>Host: <span className="font-medium text-slate-800">{bigMarkerConferenceDetails.host_name || 'N/A'}</span></p>
+            <p>Webinar URL: <a className="text-indigo-600 underline" href={bigMarkerConferenceDetails.webinar_url} target="_blank" rel="noreferrer">{bigMarkerConferenceDetails.webinar_url || 'N/A'}</a></p>
+            <p>Registration URL: <a className="text-indigo-600 underline" href={bigMarkerConferenceDetails.registration_url} target="_blank" rel="noreferrer">{bigMarkerConferenceDetails.registration_url || 'N/A'}</a></p>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">No synced BigMarker conference details yet.</p>
+        )}
+      </div>
+    );
+  };
+
   const renderWebsite = () => (
     <div className="space-y-6 animate-fadeIn h-full flex flex-col">
       {!eventPlan.websiteHtml ? (
@@ -974,13 +1407,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
 
-              {/* BigMarker Specific Field Sync Button */}
               {integrationConfig.type === 'bigmarker' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    BigMarker API Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={bigMarkerApiKey}
+                      onChange={(e) => setBigMarkerApiKey(e.target.value)}
+                      placeholder="Enter API Key to enable sync..."
+                      className="w-full border border-slate-300 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <Key className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Key is saved safely in database.json
+                  </p>
+                </div>
+              )}
+
+              {(integrationConfig.type === 'bigmarker' || integrationConfig.type === 'zoom') && (
                 <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
                   <div className="flex justify-between items-center mb-2">
                     <h4 className="text-sm font-bold text-slate-700">Form Fields</h4>
                     <button
-                      onClick={handleSyncBigMarkerFields}
+                      onClick={integrationConfig.type === 'zoom' ? handleSyncZoomFields : handleSyncBigMarkerFields}
                       disabled={isSyncingFields || !integrationConfig.platformId}
                       className="text-xs text-indigo-600 font-medium flex items-center gap-1 hover:underline disabled:opacity-50 disabled:no-underline"
                     >
@@ -1001,16 +1454,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                   ) : (
                     <p className="text-xs text-slate-400">
-                      Click "Sync Fields" to pull form configuration from BigMarker.
+                      Click "Sync Fields" to pull registration fields from {integrationConfig.type === 'zoom' ? 'Zoom' : 'BigMarker'}.
                     </p>
                   )}
                 </div>
               )}
             </div>
           )}
+          {integrationConfig.type === 'zoom' && (
+            <div className="w-full max-w-md mb-8 animate-fadeIn">
+              {renderZoomMeetingDetailsCard()}
+            </div>
+          )}
+          {integrationConfig.type === 'bigmarker' && (
+            <div className="w-full max-w-md mb-8 animate-fadeIn">
+              {renderBigMarkerConferenceDetailsCard()}
+            </div>
+          )}
 
           <button
-            onClick={onGenerateWebsite}
+            onClick={() => onGenerateWebsite()}
             disabled={isGeneratingWebsite}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-8 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-indigo-200"
           >
@@ -1034,6 +1497,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">
                 {integrationConfig.type === 'email' ? 'Email Form' : `${integrationConfig.type} Integrated`}
               </span>
+              {integrationConfig.type === 'zoom' && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  integrationConfig.platformId
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {integrationConfig.platformId
+                    ? `Zoom Meeting Linked (${integrationConfig.platformId})`
+                    : 'Zoom Meeting Missing'}
+                </span>
+              )}
+              {integrationConfig.type === 'bigmarker' && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  integrationConfig.platformId
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {integrationConfig.platformId
+                    ? `BigMarker Conference Linked (${integrationConfig.platformId})`
+                    : 'BigMarker Conference Missing'}
+                </span>
+              )}
             </div>
             <div className="flex gap-2">
               <button
@@ -1045,6 +1530,42 @@ export const Dashboard: React.FC<DashboardProps> = ({
               >
                 <RefreshCw className="w-4 h-4" /> Settings
               </button>
+              {!showCode && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (isEditingLandingDetails) {
+                        handleSaveLandingDetails();
+                      } else {
+                        setIsEditingLandingDetails(true);
+                      }
+                    }}
+                    className={`p-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors ${
+                      isEditingLandingDetails
+                        ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                        : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                    }`}
+                  >
+                    {isEditingLandingDetails ? (
+                      <>
+                        <Save className="w-4 h-4" /> Save Landing
+                      </>
+                    ) : (
+                      <>
+                        <Edit3 className="w-4 h-4" /> Edit Landing
+                      </>
+                    )}
+                  </button>
+                  {isEditingLandingDetails && (
+                    <button
+                      onClick={handleCancelLandingDetails}
+                      className="p-2 rounded-lg flex items-center gap-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+                    >
+                      <X className="w-4 h-4" /> Cancel
+                    </button>
+                  )}
+                </>
+              )}
               {showCode && (
                 <button
                   onClick={() => {
@@ -1096,6 +1617,69 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </button>
             </div>
           </div>
+
+          {!showCode && (
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 animate-fadeIn">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-bold text-slate-800">Landing Page Content</h4>
+                {isEditingLandingDetails && (
+                  <span className="text-xs text-indigo-600 font-medium">Saving regenerates the page preview</span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Headline</label>
+                  <input
+                    type="text"
+                    disabled={!isEditingLandingDetails}
+                    value={landingDraft.title}
+                    onChange={(e) => setLandingDraft({ ...landingDraft, title: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Tagline</label>
+                  <input
+                    type="text"
+                    disabled={!isEditingLandingDetails}
+                    value={landingDraft.marketingTagline}
+                    onChange={(e) => setLandingDraft({ ...landingDraft, marketingTagline: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Description</label>
+                  <textarea
+                    disabled={!isEditingLandingDetails}
+                    value={landingDraft.description}
+                    onChange={(e) => setLandingDraft({ ...landingDraft, description: e.target.value })}
+                    rows={3}
+                    className="w-full border border-slate-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Date Label</label>
+                  <input
+                    type="text"
+                    disabled={!isEditingLandingDetails}
+                    value={landingDraft.date}
+                    onChange={(e) => setLandingDraft({ ...landingDraft, date: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Platform / Location</label>
+                  <input
+                    type="text"
+                    disabled={!isEditingLandingDetails}
+                    value={landingDraft.location}
+                    onChange={(e) => setLandingDraft({ ...landingDraft, location: e.target.value })}
+                    className="w-full border border-slate-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Integration Settings Panel */}
           {showIntegrationSettings && (
@@ -1153,6 +1737,65 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     />
                     <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                   </div>
+                </div>
+              )}
+              {integrationConfig.type === 'zoom' && (
+                <div className="mb-4">
+                  {renderZoomMeetingDetailsCard()}
+                </div>
+              )}
+              {integrationConfig.type === 'bigmarker' && (
+                <div className="mb-4">
+                  {renderBigMarkerConferenceDetailsCard()}
+                </div>
+              )}
+
+              {(integrationConfig.type === 'bigmarker') && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    BigMarker API Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={bigMarkerApiKey}
+                      onChange={(e) => setBigMarkerApiKey(e.target.value)}
+                      placeholder="Enter API Key..."
+                      className="w-full border border-slate-300 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                    <Key className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+              )}
+
+              {(integrationConfig.type === 'zoom' || integrationConfig.type === 'bigmarker') && (
+                <div className="mb-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-sm font-bold text-slate-700">Registration Fields</h4>
+                    <button
+                      onClick={integrationConfig.type === 'zoom' ? handleSyncZoomFields : handleSyncBigMarkerFields}
+                      disabled={isSyncingFields || !integrationConfig.platformId}
+                      className="text-xs text-indigo-600 font-medium flex items-center gap-1 hover:underline disabled:opacity-50 disabled:no-underline"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isSyncingFields ? 'animate-spin' : ''}`} />
+                      {isSyncingFields ? 'Syncing...' : 'Sync Fields'}
+                    </button>
+                  </div>
+                  {integrationConfig.customFields ? (
+                    <div className="space-y-1 max-h-36 overflow-auto">
+                      {integrationConfig.customFields.map(field => (
+                        <div key={field.id} className="text-xs text-slate-600 flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                          <span className="font-mono">{field.label}</span>
+                          <span className="text-slate-400 italic">({field.type})</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      Sync fields before regenerating so landing-page form matches {integrationConfig.type === 'zoom' ? 'Zoom' : 'BigMarker'} registration.
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -1216,6 +1859,94 @@ export const Dashboard: React.FC<DashboardProps> = ({
     </div>
   );
 
+  const renderRegistrants = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-fadeIn">
+      <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-slate-800">Registered Users</h3>
+        <span className="text-xs font-medium px-3 py-1.5 bg-slate-100 text-slate-600 rounded-full">
+          {liveRegistrants.length} Total
+        </span>
+      </div>
+      {liveRegistrants.length === 0 ? (
+        <div className="p-8 text-sm text-slate-500">No registrants yet.</div>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {liveRegistrants.map((reg) => (
+            <div key={reg.id} className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div>
+                <p className="font-medium text-slate-800">{reg.name}</p>
+                <p className="text-sm text-slate-600">{reg.email}</p>
+                {reg.company && <p className="text-xs text-slate-500">{reg.company}</p>}
+              </div>
+              <p className="text-xs text-slate-500">
+                {reg.registeredAt ? new Date(reg.registeredAt).toLocaleString() : 'N/A'}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderUploadedFiles = () => {
+    const files = Array.isArray(eventPlan.uploadedFiles) ? eventPlan.uploadedFiles : [];
+    const palette = Array.isArray(eventPlan.brandPalette) ? eventPlan.brandPalette : [];
+    const hasAgendaText = !!String(eventPlan.agendaSourceText || '').trim();
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">Uploaded Assets</h3>
+          {files.length === 0 ? (
+            <p className="text-sm text-slate-500">No uploaded files captured for this meeting yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {files.map((file) => (
+                <div key={file.id} className="border border-slate-200 rounded-lg p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{file.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {file.kind.toUpperCase()} • {file.source.toUpperCase()}
+                      {file.mimeType ? ` • ${file.mimeType}` : ''}
+                      {typeof file.sizeBytes === 'number' ? ` • ${(file.sizeBytes / 1024).toFixed(1)} KB` : ''}
+                    </p>
+                  </div>
+                  {file.url && (
+                    <a href={file.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                      Open Link
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">Detected Brand Colors</h3>
+          {palette.length === 0 ? (
+            <p className="text-sm text-slate-500">No brand colors detected yet.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {palette.map((color) => (
+                <span key={color} className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border border-slate-200 bg-white">
+                  <span className="inline-block w-3 h-3 rounded-full border border-slate-200" style={{ backgroundColor: color }} />
+                  {color}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">Agenda Source Snapshot</h3>
+          <p className="text-sm text-slate-600 whitespace-pre-wrap">
+            {hasAgendaText ? String(eventPlan.agendaSourceText).slice(0, 2000) : 'No agenda source text captured.'}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       {/* Toast Notification for Registration */}
@@ -1244,7 +1975,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'overview' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
             <Sparkles className="w-5 h-5" />
-            Strategy
+            Event Details
           </button>
           <button
             onClick={() => setActiveTab('agenda')}
@@ -1268,11 +1999,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Budget
           </button>
           <button
+            onClick={() => setActiveTab('files')}
+            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'files' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <Upload className="w-5 h-5" />
+            Uploaded Files
+          </button>
+          <button
             onClick={() => setActiveTab('website')}
             className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'website' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
           >
             <Globe className="w-5 h-5" />
             Landing Page
+          </button>
+          <button
+            onClick={() => setActiveTab('registrants')}
+            className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'registrants' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+          >
+            <Users className="w-5 h-5" />
+            Registered Users
           </button>
         </nav>
 
@@ -1337,7 +2082,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             {activeTab === 'agenda' && renderAgenda()}
             {activeTab === 'tasks' && renderTasks()}
             {activeTab === 'budget' && renderBudget()}
+            {activeTab === 'files' && renderUploadedFiles()}
             {activeTab === 'website' && renderWebsite()}
+            {activeTab === 'registrants' && renderRegistrants()}
           </div>
         </div>
 
@@ -1369,6 +2116,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
       </main>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-6 right-6 z-[100] px-6 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-bounce-in ${toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+          }`}>
+          <div className="bg-white/20 p-1 rounded-full">
+            {toast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+          </div>
+          <span className="font-bold">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 hover:bg-white/20 rounded-full p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

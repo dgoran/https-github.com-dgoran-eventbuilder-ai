@@ -13,3 +13,24 @@ export const getApiUrl = (path: string): string => {
 
   return `${cleanBase}${cleanPath}`;
 };
+
+export const getApiAuthHeaders = (): Record<string, string> => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  const token = window.localStorage.getItem('eventbuilder_api_token');
+  if (!token) {
+    return {};
+  }
+
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return {};
+  }
+
+  return {
+    Authorization: `Bearer ${trimmed}`,
+    'x-api-token': trimmed
+  };
+};
