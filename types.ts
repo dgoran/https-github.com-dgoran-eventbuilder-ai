@@ -60,6 +60,7 @@ export interface UploadedAsset {
 export interface EventPlan {
   id: string;
   createdAt: number;
+  landingSubdomain?: string;
   title: string;
   description: string;
   theme: string;
@@ -94,9 +95,27 @@ export interface FormField {
 }
 
 export interface IntegrationConfig {
-  type: 'zoom' | 'bigmarker' | 'email' | 'none';
+  type: 'zoom' | 'bigmarker' | 'custom' | 'email' | 'none';
   platformId?: string;
   customFields?: FormField[]; // Fields synced from the platform
+  platformSettings?: {
+    startTime?: string;
+    timezone?: string;
+    durationMinutes?: number;
+    registrationRequired?: boolean;
+    chatNeeded?: boolean;
+    qnaNeeded?: boolean;
+    breakoutRoomsNeeded?: boolean;
+    recordingNeeded?: boolean;
+    requestPermissionToUnmuteParticipants?: boolean;
+    channelId?: string;
+    scheduleType?: 'one_time' | 'multiple_times' | '24_hour_room';
+    webcastMode?: 'interactive' | 'webcast' | 'automatic' | 'required' | 'optional';
+    audienceRoomLayout?: 'classic' | 'modular';
+    privacy?: 'private' | 'public';
+    customProviderName?: string;
+    customPlatformUrl?: string;
+  };
   // Compatibility fields for preview components
   apiKey?: string;
   proxyUrl?: string;

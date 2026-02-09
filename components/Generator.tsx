@@ -21,7 +21,7 @@ import { createBigMarkerConference, createZoomMeeting, extractGoogleSlidesColors
 
 interface GeneratorProps {
   onGenerate: (prompt: string, context?: {
-    integrationType?: 'zoom' | 'bigmarker' | 'email' | 'none';
+    integrationType?: 'zoom' | 'bigmarker' | 'custom' | 'email' | 'none';
     integrationPlatformId?: string;
     agendaSourceText?: string;
     brandPalette?: string[];
@@ -490,7 +490,7 @@ BigMarker conference created successfully:
         ? 'zoom'
         : platform === 'bigmarker'
           ? 'bigmarker'
-          : 'email';
+          : 'custom';
 
     const now = Date.now();
     const uploadedFiles: Array<{

@@ -121,6 +121,8 @@ const buildManualDraftPlan = (prompt: string, integration: IntegrationConfig): E
         ? 'Zoom'
         : integration.type === 'bigmarker'
           ? 'BigMarker'
+          : integration.type === 'custom'
+            ? 'Custom Webinar Platform'
           : integration.type === 'email'
             ? 'Email Registration'
             : 'Virtual Event',
@@ -241,7 +243,7 @@ const App: React.FC = () => {
   }, [isServerOffline, authUser]);
 
   const handleGenerate = async (prompt: string, context?: {
-    integrationType?: 'zoom' | 'bigmarker' | 'email' | 'none';
+    integrationType?: 'zoom' | 'bigmarker' | 'custom' | 'email' | 'none';
     integrationPlatformId?: string;
     agendaSourceText?: string;
     brandPalette?: string[];

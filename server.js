@@ -56,6 +56,59 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+function slugifySubdomain(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
+function buildDefaultSubdomainSeed(event) {
+  const titleSeed = slugifySubdomain(event?.title || 'event') || 'event';
+  const idSeed = String(event?.id || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(-6) || generateId().slice(-6);
+  return `${titleSeed}-${idSeed}`.slice(0, 58);
+}
+
+function ensureUniqueLandingSubdomain(events, requestedSubdomain, eventId) {
+  const base = slugifySubdomain(requestedSubdomain) || 'event';
+  const taken = new Set(
+    (Array.isArray(events) ? events : [])
+      .filter((ev) => String(ev?.id || '') !== String(eventId || ''))
+      .map((ev) => slugifySubdomain(ev?.landingSubdomain || ''))
+      .filter(Boolean)
+  );
+  if (!taken.has(base)) return base;
+  for (let i = 2; i < 10000; i += 1) {
+    const candidate = `${base}-${i}`.slice(0, 62);
+    if (!taken.has(candidate)) return candidate;
+  }
+  return `${base}-${Date.now().toString(36)}`.slice(0, 62);
+}
+
+function ensureEventLandingSubdomain(event, events) {
+  const seeded = slugifySubdomain(event?.landingSubdomain) || buildDefaultSubdomainSeed(event);
+  const unique = ensureUniqueLandingSubdomain(events, seeded, event?.id);
+  return { ...event, landingSubdomain: unique };
+}
+
+function extractRequestedSubdomain(req) {
+  const hostHeader = String(req.headers.host || '').toLowerCase();
+  const host = hostHeader.split(':')[0];
+  if (!host) return null;
+  if (host.endsWith('.localhost')) {
+    const sub = host.slice(0, -'.localhost'.length).trim();
+    return sub || null;
+  }
+  const parts = host.split('.').filter(Boolean);
+  if (parts.length < 3) return null;
+  const first = String(parts[0] || '').trim();
+  if (!first || ['www', 'api'].includes(first)) return null;
+  return first;
+}
+
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 }
@@ -447,6 +500,29 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json({ limit: '10mb' })); // Increased limit for images
 app.use(express.urlencoded({ extended: true }));
+
+// Serve event landing pages by subdomain (e.g. cardiology-abc123.localhost:8080)
+app.use(async (req, res, next) => {
+  try {
+    if (req.method !== 'GET') return next();
+    if (String(req.path || '').startsWith('/api/')) return next();
+    const requestedSubdomain = extractRequestedSubdomain(req);
+    if (!requestedSubdomain) return next();
+
+    const db = await getDb();
+    const events = Array.isArray(db.events) ? db.events : [];
+    const matched = events.find((ev) => {
+      const sub = slugifySubdomain(ev?.landingSubdomain || buildDefaultSubdomainSeed(ev));
+      return sub === requestedSubdomain;
+    });
+    if (!matched || !matched.websiteHtml) return next();
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(200).send(String(matched.websiteHtml));
+  } catch (error) {
+    return next();
+  }
+});
 
 // Ensure browser clients receive API token cookie even when index.html is served by express.static.
 app.use((req, res, next) => {
@@ -2897,8 +2973,8 @@ app.get('/api/events', requireProtectedApiAuth, requireAnyRole(['superadmin', 'a
 
 app.post('/api/events', requireProtectedApiAuth, requireAnyRole(['superadmin', 'admin', 'organizer']), async (req, res) => {
   try {
-    const newEvent = req.body;
     const db = await getDb();
+    const newEvent = ensureEventLandingSubdomain(req.body || {}, db.events || []);
     db.events = [newEvent, ...(db.events || [])];
     await saveDb(db);
     res.json(newEvent);
@@ -2910,11 +2986,18 @@ app.post('/api/events', requireProtectedApiAuth, requireAnyRole(['superadmin', '
 app.put('/api/events/:id', requireProtectedApiAuth, requireAnyRole(['superadmin', 'admin', 'organizer']), async (req, res) => {
   try {
     const { id } = req.params;
-    const updatedEvent = req.body;
+    const incomingEvent = req.body || {};
     const db = await getDb();
     const index = (db.events || []).findIndex(e => e.id === id);
 
     if (index !== -1) {
+      const existing = db.events[index] || {};
+      const merged = {
+        ...existing,
+        ...incomingEvent,
+        id
+      };
+      const updatedEvent = ensureEventLandingSubdomain(merged, db.events || []);
       db.events[index] = updatedEvent;
       await saveDb(db);
       res.json(updatedEvent);
@@ -3310,7 +3393,7 @@ app.post('/api/ai/generate-website', async (req, res) => {
       </script>
     `;
 
-    if ((integration.type === 'bigmarker' || integration.type === 'zoom') && Array.isArray(integration.customFields) && integration.customFields.length > 0) {
+    if ((integration.type === 'bigmarker' || integration.type === 'zoom' || integration.type === 'custom') && Array.isArray(integration.customFields) && integration.customFields.length > 0) {
       const formFieldsHtml = integration.customFields.map(field => {
         if (field.type === 'checkbox') {
           return `
@@ -3358,13 +3441,13 @@ app.post('/api/ai/generate-website', async (req, res) => {
 
       integrationInstructions = `
         Use the exact HTML below for the Registration Form inside the registration area.
-        Do not create your own form fields. Use these pre-configured fields that match the ${integration.type === 'zoom' ? 'Zoom' : 'BigMarker'} API:
+        Do not create your own form fields. Use these pre-configured fields that match the ${integration.type === 'zoom' ? 'Zoom' : integration.type === 'bigmarker' ? 'BigMarker' : 'custom webinar'} registration schema:
         
         <form class="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
            ${formFieldsHtml}
            <div class="flex items-center justify-between">
             <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full" type="button">
-              ${integration.type === 'zoom' ? 'Register via Zoom' : 'Save my Spot on BigMarker'}
+              ${integration.type === 'zoom' ? 'Register via Zoom' : integration.type === 'bigmarker' ? 'Save my Spot on BigMarker' : 'Register for Webinar'}
             </button>
           </div>
         </form>
@@ -3383,6 +3466,13 @@ app.post('/api/ai/generate-website', async (req, res) => {
         Create a registration form that simulates a BigMarker Webinar Registration.
         Form fields: First Name (name="first_name"), Last Name (name="last_name"), Email (name="email").
         Button Text: "Save my Spot on BigMarker".
+        Add the script tag provided below at the end of the body.
+      `;
+    } else if (integration.type === 'custom') {
+      integrationInstructions = `
+        Create a registration form for a Custom Webinar Platform.
+        Form fields: Name (name="name"), Email (name="email"), Organization (name="company", optional).
+        Button Text: "Register for Webinar".
         Add the script tag provided below at the end of the body.
       `;
     } else {

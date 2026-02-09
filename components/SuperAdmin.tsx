@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Trash2, Save, Key, Layout, LogOut, Users, X, Check, Activity, AlertCircle, Wifi, AlertTriangle, Lock } from 'lucide-react';
+import { Trash2, Save, Key, Layout, LogOut, Users, X, Check, Activity, AlertCircle, Wifi, AlertTriangle, Lock, Pencil } from 'lucide-react';
 import { Button, Modal } from './UIComponents';
 import { EventPlan, AdminSettings, Registrant } from '../types';
 import { getEvents, deleteEvent, getAdminSettings, saveAdminSettings } from '../services/storageService';
@@ -43,6 +43,11 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
   });
   const [activeTab, setActiveTab] = useState<'events' | 'keys' | 'users'>('events');
   const [selectedEventForRegistrants, setSelectedEventForRegistrants] = useState<EventPlan | null>(null);
+  const [selectedEventForManage, setSelectedEventForManage] = useState<EventPlan | null>(null);
+  const [managedEventDraft, setManagedEventDraft] = useState<EventPlan | null>(null);
+  const [managedEventRawJson, setManagedEventRawJson] = useState('');
+  const [managedEventError, setManagedEventError] = useState<string | null>(null);
+  const [isSavingManagedEvent, setIsSavingManagedEvent] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [serverStatus, setServerStatus] = useState<'online' | 'offline' | 'checking'>('checking');
   const [isTestingBigMarker, setIsTestingBigMarker] = useState(false);
@@ -414,6 +419,94 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
     }
   };
 
+  const handleOpenManageEvent = (event: EventPlan) => {
+    const clone: EventPlan = JSON.parse(JSON.stringify(event));
+    setSelectedEventForManage(event);
+    setManagedEventDraft(clone);
+    setManagedEventRawJson(JSON.stringify(clone, null, 2));
+    setManagedEventError(null);
+  };
+
+  const handleCloseManageEvent = () => {
+    setSelectedEventForManage(null);
+    setManagedEventDraft(null);
+    setManagedEventRawJson('');
+    setManagedEventError(null);
+    setIsSavingManagedEvent(false);
+  };
+
+  const handleManagedEventFieldChange = (field: keyof EventPlan, value: any) => {
+    if (!managedEventDraft) return;
+    const next = { ...managedEventDraft, [field]: value };
+    setManagedEventDraft(next);
+    setManagedEventRawJson(JSON.stringify(next, null, 2));
+  };
+
+  const setManagedIntegrationConfig = (nextConfig: EventPlan['integrationConfig']) => {
+    if (!managedEventDraft) return;
+    const next = { ...managedEventDraft, integrationConfig: nextConfig };
+    setManagedEventDraft(next);
+    setManagedEventRawJson(JSON.stringify(next, null, 2));
+  };
+
+  const updateManagedPlatformSettings = (patch: Record<string, any>) => {
+    if (!managedEventDraft) return;
+    const currentConfig = managedEventDraft.integrationConfig || { type: 'none' as const };
+    const currentSettings = currentConfig.platformSettings || {};
+    const nextConfig = {
+      ...currentConfig,
+      platformSettings: {
+        ...currentSettings,
+        ...patch
+      }
+    };
+    setManagedIntegrationConfig(nextConfig);
+  };
+
+  const handleManagedEventRawJsonChange = (raw: string) => {
+    setManagedEventRawJson(raw);
+    try {
+      const parsed = JSON.parse(raw);
+      setManagedEventDraft(parsed);
+      setManagedEventError(null);
+    } catch (_error) {
+      setManagedEventError('JSON is invalid. Fix JSON syntax before saving.');
+    }
+  };
+
+  const handleSaveManagedEvent = async () => {
+    if (!managedEventDraft || !selectedEventForManage) return;
+    if (managedEventError) return;
+
+    if (!managedEventDraft.id || String(managedEventDraft.id).trim() !== String(selectedEventForManage.id).trim()) {
+      setManagedEventError('Event ID cannot be changed.');
+      return;
+    }
+
+    setIsSavingManagedEvent(true);
+    setManagedEventError(null);
+    try {
+      const response = await fetch(getApiUrl(`/api/events/${encodeURIComponent(String(selectedEventForManage.id))}`), {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...getApiAuthHeaders() },
+        body: JSON.stringify(managedEventDraft)
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error || 'Failed to save event');
+      }
+      await loadData();
+      handleCloseManageEvent();
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    } catch (error: any) {
+      setManagedEventError(error?.message || 'Failed to save event');
+    } finally {
+      setIsSavingManagedEvent(false);
+    }
+  };
+
   const handleTestBigMarker = async () => {
     const typedKey = (settings.bigMarkerApiKey || '').trim();
     const typedChannelId = (settings.bigMarkerChannelId || '').trim();
@@ -769,6 +862,14 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
                       </td>
                       <td className="p-4 text-slate-500 text-sm">{event.budget.currency}{event.budget.totalBudget.toLocaleString()}</td>
                       <td className="p-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenManageEvent(event)}
+                          className="text-indigo-600 hover:text-indigo-800 p-2 rounded hover:bg-indigo-50 transition-colors inline-block cursor-pointer"
+                          title="Manage Event"
+                        >
+                          <Pencil className="w-5 h-5" />
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => handleDelete(e, String(event.id))}
@@ -1278,6 +1379,334 @@ export const SuperAdmin: React.FC<SuperAdminProps> = ({ onLogout, currentEventId
           </div>
         </div>
       </Modal>
+
+      {selectedEventForManage && managedEventDraft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[92vh] overflow-y-auto border border-gray-100">
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <h3 className="font-bold text-xl text-gray-900">Manage Webinar/Event</h3>
+              <button onClick={handleCloseManageEvent} className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-full hover:bg-gray-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Event ID</label>
+                <input
+                  value={managedEventDraft.id || ''}
+                  disabled
+                  className="w-full border border-slate-200 bg-slate-50 rounded-lg p-2.5 text-slate-500"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                <input
+                  value={managedEventDraft.title || ''}
+                  onChange={(e) => handleManagedEventFieldChange('title', e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={managedEventDraft.description || ''}
+                  onChange={(e) => handleManagedEventFieldChange('description', e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                <input
+                  value={managedEventDraft.date || ''}
+                  onChange={(e) => handleManagedEventFieldChange('date', e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
+                <input
+                  value={managedEventDraft.location || ''}
+                  onChange={(e) => handleManagedEventFieldChange('location', e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Estimated Attendees</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={managedEventDraft.estimatedAttendees || 0}
+                  onChange={(e) => handleManagedEventFieldChange('estimatedAttendees', Number(e.target.value || 0))}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Theme</label>
+                <input
+                  value={managedEventDraft.theme || ''}
+                  onChange={(e) => handleManagedEventFieldChange('theme', e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Integration Type</label>
+                <select
+                  value={managedEventDraft.integrationConfig?.type || 'none'}
+                  onChange={(e) => {
+                    const next = {
+                      ...(managedEventDraft.integrationConfig || { type: 'none' as const }),
+                      type: e.target.value as 'zoom' | 'bigmarker' | 'custom' | 'email' | 'none'
+                    };
+                    setManagedIntegrationConfig(next);
+                  }}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                >
+                  <option value="none">None</option>
+                  <option value="zoom">Zoom</option>
+                  <option value="bigmarker">BigMarker</option>
+                  <option value="custom">Custom Webinar</option>
+                  <option value="email">Email</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Platform ID (Zoom Meeting / BigMarker Conference)</label>
+                <input
+                  value={managedEventDraft.integrationConfig?.platformId || ''}
+                  onChange={(e) => {
+                    const next = {
+                      ...(managedEventDraft.integrationConfig || { type: 'none' as const }),
+                      platformId: e.target.value
+                    };
+                    setManagedIntegrationConfig(next);
+                  }}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {managedEventDraft.integrationConfig?.type === 'zoom' && (
+              <div className="border border-indigo-100 rounded-xl p-4 bg-indigo-50/50 space-y-3">
+                <p className="text-sm font-semibold text-indigo-900">Zoom Webinar/Meeting Options</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(managedEventDraft.integrationConfig?.platformSettings?.registrationRequired)}
+                      onChange={(e) => updateManagedPlatformSettings({ registrationRequired: e.target.checked })}
+                    />
+                    Registration required
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(managedEventDraft.integrationConfig?.platformSettings?.chatNeeded)}
+                      onChange={(e) => updateManagedPlatformSettings({ chatNeeded: e.target.checked })}
+                    />
+                    Chat enabled
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(managedEventDraft.integrationConfig?.platformSettings?.qnaNeeded)}
+                      onChange={(e) => updateManagedPlatformSettings({ qnaNeeded: e.target.checked })}
+                    />
+                    Q&A enabled
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(managedEventDraft.integrationConfig?.platformSettings?.breakoutRoomsNeeded)}
+                      onChange={(e) => updateManagedPlatformSettings({ breakoutRoomsNeeded: e.target.checked })}
+                    />
+                    Breakout rooms enabled
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(managedEventDraft.integrationConfig?.platformSettings?.recordingNeeded)}
+                      onChange={(e) => updateManagedPlatformSettings({ recordingNeeded: e.target.checked })}
+                    />
+                    Cloud recording enabled
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={managedEventDraft.integrationConfig?.platformSettings?.requestPermissionToUnmuteParticipants !== false}
+                      onChange={(e) => updateManagedPlatformSettings({ requestPermissionToUnmuteParticipants: e.target.checked })}
+                    />
+                    Request permission to unmute participants
+                  </label>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Start Time (ISO)</label>
+                    <input
+                      value={managedEventDraft.integrationConfig?.platformSettings?.startTime || ''}
+                      onChange={(e) => updateManagedPlatformSettings({ startTime: e.target.value })}
+                      placeholder="2026-02-10T15:00:00Z"
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Timezone</label>
+                    <input
+                      value={managedEventDraft.integrationConfig?.platformSettings?.timezone || ''}
+                      onChange={(e) => updateManagedPlatformSettings({ timezone: e.target.value })}
+                      placeholder="UTC"
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Duration (minutes)</label>
+                    <input
+                      type="number"
+                      min={15}
+                      value={managedEventDraft.integrationConfig?.platformSettings?.durationMinutes ?? 60}
+                      onChange={(e) => updateManagedPlatformSettings({ durationMinutes: Math.max(15, Number(e.target.value || 60)) })}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {managedEventDraft.integrationConfig?.type === 'bigmarker' && (
+              <div className="border border-sky-100 rounded-xl p-4 bg-sky-50/50 space-y-3">
+                <p className="text-sm font-semibold text-sky-900">BigMarker Live Webinar Options</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Hosted By (Channel ID)</label>
+                    <input
+                      value={managedEventDraft.integrationConfig?.platformSettings?.channelId || ''}
+                      onChange={(e) => updateManagedPlatformSettings({ channelId: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Schedule Type</label>
+                    <select
+                      value={managedEventDraft.integrationConfig?.platformSettings?.scheduleType || 'one_time'}
+                      onChange={(e) => updateManagedPlatformSettings({ scheduleType: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      <option value="one_time">One time</option>
+                      <option value="multiple_times">Multiple times</option>
+                      <option value="24_hour_room">24 hour room</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Live Event Experience</label>
+                    <select
+                      value={managedEventDraft.integrationConfig?.platformSettings?.webcastMode || 'webcast'}
+                      onChange={(e) => updateManagedPlatformSettings({ webcastMode: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      <option value="webcast">Webcast</option>
+                      <option value="interactive">Interactive</option>
+                      <option value="automatic">Automatic</option>
+                      <option value="required">Required</option>
+                      <option value="optional">Optional</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Audience Room Layout</label>
+                    <select
+                      value={managedEventDraft.integrationConfig?.platformSettings?.audienceRoomLayout || 'classic'}
+                      onChange={(e) => updateManagedPlatformSettings({ audienceRoomLayout: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      <option value="classic">Classic</option>
+                      <option value="modular">Modular</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Privacy</label>
+                    <select
+                      value={managedEventDraft.integrationConfig?.platformSettings?.privacy || 'private'}
+                      onChange={(e) => updateManagedPlatformSettings({ privacy: e.target.value })}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      <option value="private">Private</option>
+                      <option value="public">Public</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Duration (minutes)</label>
+                    <input
+                      type="number"
+                      min={15}
+                      value={managedEventDraft.integrationConfig?.platformSettings?.durationMinutes ?? 60}
+                      onChange={(e) => updateManagedPlatformSettings({ durationMinutes: Math.max(15, Number(e.target.value || 60)) })}
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={managedEventDraft.integrationConfig?.platformSettings?.registrationRequired !== false}
+                      onChange={(e) => updateManagedPlatformSettings({ registrationRequired: e.target.checked })}
+                    />
+                    Registration required
+                  </label>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Start Time (ISO)</label>
+                    <input
+                      value={managedEventDraft.integrationConfig?.platformSettings?.startTime || ''}
+                      onChange={(e) => updateManagedPlatformSettings({ startTime: e.target.value })}
+                      placeholder="2026-02-10T15:00:00Z"
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Timezone</label>
+                    <input
+                      value={managedEventDraft.integrationConfig?.platformSettings?.timezone || ''}
+                      onChange={(e) => updateManagedPlatformSettings({ timezone: e.target.value })}
+                      placeholder="UTC"
+                      className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Raw Event JSON (all settings/options)</label>
+              <textarea
+                rows={16}
+                value={managedEventRawJson}
+                onChange={(e) => handleManagedEventRawJsonChange(e.target.value)}
+                className={`w-full border rounded-lg p-2.5 font-mono text-xs focus:ring-2 focus:outline-none ${
+                  managedEventError ? 'border-rose-300 focus:ring-rose-500' : 'border-slate-300 focus:ring-indigo-500'
+                }`}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                You can edit any setting here. Keep `id` unchanged so updates apply to the same webinar.
+              </p>
+            </div>
+
+            {managedEventError && (
+              <p className="text-sm text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+                {managedEventError}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="secondary" onClick={handleCloseManageEvent}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSaveManagedEvent}
+                disabled={isSavingManagedEvent || !!managedEventError}
+              >
+                {isSavingManagedEvent ? 'Saving...' : 'Save Event'}
+              </Button>
+            </div>
+          </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -62,6 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   setIntegrationConfig,
   onExit
 }) => {
+  type IntegrationType = IntegrationConfig['type'];
   const [activeTab, setActiveTab] = useState<'overview' | 'agenda' | 'tasks' | 'budget' | 'files' | 'website' | 'registrants'>('overview');
   const [chatInput, setChatInput] = useState('');
   const [showCode, setShowCode] = useState(false);
@@ -106,6 +107,290 @@ export const Dashboard: React.FC<DashboardProps> = ({
     host_name?: string;
   }>(null);
   const [isSyncingBigMarkerDetails, setIsSyncingBigMarkerDetails] = useState(false);
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldId, setNewFieldId] = useState('');
+  const [newFieldType, setNewFieldType] = useState<FormField['type']>('text');
+  const [newFieldRequired, setNewFieldRequired] = useState(false);
+  const [newFieldOptions, setNewFieldOptions] = useState('');
+
+  const getIntegrationLabel = (type: IntegrationType): string => {
+    if (type === 'zoom') return 'Zoom';
+    if (type === 'bigmarker') return 'BigMarker';
+    if (type === 'custom') return 'Custom Webinar Platform';
+    if (type === 'email') return 'Email Registration';
+    return 'Registration';
+  };
+
+  const buildDefaultCustomWebinarFields = (): FormField[] => ([
+    { id: 'name', label: 'Full Name', type: 'text', required: true },
+    { id: 'email', label: 'Email Address', type: 'email', required: true },
+    { id: 'company', label: 'Organization', type: 'text', required: false }
+  ]);
+
+  const applyIntegrationSwitch = (nextType: IntegrationType) => {
+    const previousType = integrationConfig.type;
+    const previousSettings = integrationConfig.platformSettings || {};
+    const nextConfig: IntegrationConfig = {
+      ...integrationConfig,
+      type: nextType,
+      platformId: previousType === nextType ? integrationConfig.platformId : '',
+      customFields:
+        nextType === 'custom'
+          ? (Array.isArray(integrationConfig.customFields) && integrationConfig.customFields.length > 0
+              ? integrationConfig.customFields
+              : buildDefaultCustomWebinarFields())
+          : previousType === nextType
+            ? integrationConfig.customFields
+            : undefined,
+      platformSettings: {
+        ...previousSettings,
+        customProviderName:
+          nextType === 'custom'
+            ? (previousSettings.customProviderName || 'Custom Webinar Platform')
+            : previousSettings.customProviderName,
+      }
+    };
+    setIntegrationConfig(nextConfig);
+  };
+
+  const getMandatoryFieldIds = (type: IntegrationType): string[] => {
+    if (type === 'zoom') return ['first_name', 'last_name', 'email'];
+    if (type === 'bigmarker') return ['full_name', 'email'];
+    if (type === 'custom') return ['name', 'email'];
+    return ['email'];
+  };
+
+  const normalizeFieldId = (raw: string): string =>
+    String(raw || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+
+  const upsertCustomFields = (fields: FormField[]) => {
+    setIntegrationConfig({
+      ...integrationConfig,
+      customFields: fields
+    });
+  };
+
+  const handleAddRegistrationField = () => {
+    const label = String(newFieldLabel || '').trim();
+    if (!label) {
+      showToast('Field label is required.', 'error');
+      return;
+    }
+    const normalizedId = normalizeFieldId(newFieldId || label);
+    if (!normalizedId) {
+      showToast('Field ID is invalid.', 'error');
+      return;
+    }
+    const current = Array.isArray(integrationConfig.customFields) ? integrationConfig.customFields : [];
+    if (current.some((f) => String(f.id).toLowerCase() === normalizedId)) {
+      showToast(`Field "${normalizedId}" already exists.`, 'error');
+      return;
+    }
+
+    const options = newFieldType === 'select'
+      ? String(newFieldOptions || '').split(',').map((x) => x.trim()).filter(Boolean)
+      : undefined;
+    const nextField: FormField = {
+      id: normalizedId,
+      label,
+      type: newFieldType,
+      required: newFieldRequired,
+      options: options && options.length > 0 ? options : undefined
+    };
+    upsertCustomFields([...current, nextField]);
+    setNewFieldLabel('');
+    setNewFieldId('');
+    setNewFieldType('text');
+    setNewFieldRequired(false);
+    setNewFieldOptions('');
+    showToast('Field added.', 'success');
+  };
+
+  const handleRemoveRegistrationField = (fieldId: string) => {
+    const id = String(fieldId || '').toLowerCase();
+    if (!id) return;
+    const mandatory = getMandatoryFieldIds(integrationConfig.type);
+    if (mandatory.includes(id)) {
+      showToast(`"${fieldId}" is required for ${getIntegrationLabel(integrationConfig.type)} registration.`, 'error');
+      return;
+    }
+    const current = Array.isArray(integrationConfig.customFields) ? integrationConfig.customFields : [];
+    const next = current.filter((f) => String(f.id).toLowerCase() !== id);
+    upsertCustomFields(next);
+    showToast('Field removed.', 'success');
+  };
+
+  const renderRegistrationFieldsEditor = (emptyHint: string) => (
+    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+      <div className="flex justify-between items-center mb-2">
+        <h4 className="text-sm font-bold text-slate-700">Registration Fields</h4>
+        <button
+          onClick={integrationConfig.type === 'zoom' ? handleSyncZoomFields : integrationConfig.type === 'bigmarker' ? handleSyncBigMarkerFields : syncProviderFields}
+          disabled={isSyncingFields || ((integrationConfig.type === 'zoom' || integrationConfig.type === 'bigmarker') && !integrationConfig.platformId)}
+          className="text-xs text-indigo-600 font-medium flex items-center gap-1 hover:underline disabled:opacity-50 disabled:no-underline"
+        >
+          <RefreshCw className={`w-3 h-3 ${isSyncingFields ? 'animate-spin' : ''}`} />
+          {isSyncingFields ? 'Syncing...' : 'Sync Fields'}
+        </button>
+      </div>
+
+      {Array.isArray(integrationConfig.customFields) && integrationConfig.customFields.length > 0 ? (
+        <div className="space-y-2 max-h-40 overflow-auto pr-1">
+          {integrationConfig.customFields.map((field) => (
+            <div key={field.id} className="text-xs text-slate-700 flex items-center justify-between gap-2 bg-white border border-slate-200 rounded px-2 py-1.5">
+              <div className="min-w-0">
+                <span className="font-mono">{field.label}</span>
+                <span className="text-slate-400 italic ml-2">({field.type}{field.required ? ', required' : ''})</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleRemoveRegistrationField(field.id)}
+                className="text-rose-600 hover:text-rose-700 font-medium whitespace-nowrap"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400">{emptyHint}</p>
+      )}
+
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-5 gap-2">
+        <input
+          type="text"
+          value={newFieldLabel}
+          onChange={(e) => setNewFieldLabel(e.target.value)}
+          placeholder="Field label"
+          className="md:col-span-2 border border-slate-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+        />
+        <input
+          type="text"
+          value={newFieldId}
+          onChange={(e) => setNewFieldId(e.target.value)}
+          placeholder="field_id (optional)"
+          className="border border-slate-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+        />
+        <select
+          value={newFieldType}
+          onChange={(e) => setNewFieldType(e.target.value as FormField['type'])}
+          className="border border-slate-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+        >
+          <option value="text">Text</option>
+          <option value="email">Email</option>
+          <option value="select">Select</option>
+          <option value="checkbox">Checkbox</option>
+        </select>
+        <button
+          type="button"
+          onClick={handleAddRegistrationField}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white rounded px-2 py-1.5 text-xs font-semibold"
+        >
+          Add Field
+        </button>
+      </div>
+      {newFieldType === 'select' && (
+        <input
+          type="text"
+          value={newFieldOptions}
+          onChange={(e) => setNewFieldOptions(e.target.value)}
+          placeholder="Select options (comma-separated)"
+          className="mt-2 w-full border border-slate-300 rounded px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+        />
+      )}
+      <label className="mt-2 inline-flex items-center gap-2 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          checked={newFieldRequired}
+          onChange={(e) => setNewFieldRequired(e.target.checked)}
+        />
+        Required field
+      </label>
+    </div>
+  );
+
+  const adjustPlanForIntegration = (plan: EventPlan, cfg: IntegrationConfig): EventPlan => {
+    const integrationLabel = getIntegrationLabel(cfg.type);
+    const customProviderName = String(cfg.platformSettings?.customProviderName || '').trim() || 'Custom Webinar Platform';
+    const locationByType: Record<IntegrationType, string> = {
+      zoom: 'Zoom Webinar',
+      bigmarker: 'BigMarker Live Webinar',
+      custom: customProviderName,
+      email: 'Online Registration',
+      none: 'Virtual Event'
+    };
+
+    const conversionCopyByType: Record<IntegrationType, { tagline: string; descriptor: string }> = {
+      zoom: {
+        tagline: 'High-converting registration with Zoom sync, reminders, and access control.',
+        descriptor: 'Attendees register through a Zoom-native flow with structured fields, confirmation continuity, and streamlined join readiness.'
+      },
+      bigmarker: {
+        tagline: 'Branded registration with BigMarker sync for live webinar engagement.',
+        descriptor: 'Attendees register through a BigMarker-ready workflow optimized for conversion, event credibility, and clean backend sync.'
+      },
+      custom: {
+        tagline: `Branded registration routed through ${customProviderName} with flexible workflow control.`,
+        descriptor: `Attendees register through your custom webinar stack (${customProviderName}), preserving brand continuity while keeping registration friction low.`
+      },
+      email: {
+        tagline: 'Simple no-code registration flow with lightweight confirmation handling.',
+        descriptor: 'Attendees register through a focused email-first form designed to reduce drop-off and keep sign-up fast on desktop and mobile.'
+      },
+      none: {
+        tagline: plan.marketingTagline || 'Registration workflow ready.',
+        descriptor: 'Registration flow is configured and can be regenerated with provider-specific settings.'
+      }
+    };
+
+    const baseDescription = String(plan.description || '')
+      .replace(/\s*Registration platform:[^\n.]*(\.|\n)?/ig, ' ')
+      .replace(/\s*Attendees register through[^.]*\./ig, ' ')
+      .trim();
+    const descriptor = conversionCopyByType[cfg.type].descriptor;
+    const nextDescription = `${baseDescription} ${descriptor} Registration platform: ${integrationLabel}.`
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return {
+      ...plan,
+      location: locationByType[cfg.type] || plan.location,
+      description: nextDescription,
+      marketingTagline: conversionCopyByType[cfg.type].tagline
+    };
+  };
+
+  const getFallbackSubdomain = () => {
+    const titleSeed = String(eventPlan.title || 'event')
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 48) || 'event';
+    const idSeed = String(eventPlan.id || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(-6) || 'landing';
+    return `${titleSeed}-${idSeed}`.slice(0, 58);
+  };
+
+  const getLandingSubdomainUrl = (): string => {
+    if (typeof window === 'undefined') return '';
+    const protocol = window.location.protocol || 'http:';
+    const port = window.location.port ? `:${window.location.port}` : '';
+    const host = window.location.hostname || 'localhost';
+    const subdomain = String(eventPlan.landingSubdomain || '').trim() || getFallbackSubdomain();
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return `${protocol}//${subdomain}.localhost${port}/`;
+    }
+    if (host.endsWith('.localhost')) {
+      return `${protocol}//${subdomain}.localhost${port}/`;
+    }
+    const hostParts = host.split('.').filter(Boolean);
+    const rootDomain = hostParts.length >= 2 ? hostParts.slice(-2).join('.') : host;
+    return `${protocol}//${subdomain}.${rootDomain}${port}/`;
+  };
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -126,6 +411,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // Refs for file inputs
   const headerInputRef = useRef<HTMLInputElement>(null);
   const speakerInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  const uploadedFileInputRef = useRef<HTMLInputElement>(null);
+  const [newUploadedFileKind, setNewUploadedFileKind] = useState<'agenda' | 'deck'>('agenda');
+  const [newUploadedLinkName, setNewUploadedLinkName] = useState('');
+  const [newUploadedLinkUrl, setNewUploadedLinkUrl] = useState('');
 
   // Listen for registration events from the iframe website
   useEffect(() => {
@@ -639,6 +928,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
     if (integrationConfig.type === 'zoom') {
       return await handleSyncZoomFields();
     }
+    if (integrationConfig.type === 'custom') {
+      const fields = buildDefaultCustomWebinarFields();
+      setIntegrationConfig({
+        ...integrationConfig,
+        customFields: fields
+      });
+      showToast(`Initialized ${fields.length} custom webinar form fields.`, 'success');
+      return fields;
+    }
     return null;
   };
 
@@ -682,6 +980,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const nextConfig = Array.isArray(synced)
       ? { ...integrationConfig, customFields: synced }
       : integrationConfig;
+    const adjusted = adjustPlanForIntegration(eventPlan, nextConfig);
+    onManualUpdate({ ...adjusted, integrationConfig: nextConfig });
+    setLandingDraft({
+      title: adjusted.title || '',
+      marketingTagline: adjusted.marketingTagline || '',
+      description: adjusted.description || '',
+      date: adjusted.date || '',
+      location: adjusted.location || ''
+    });
+    setIntegrationConfig(nextConfig);
     onGenerateWebsite(nextConfig);
     setShowIntegrationSettings(false);
     setShowRegenerateConfirm(false);
@@ -702,6 +1010,114 @@ export const Dashboard: React.FC<DashboardProps> = ({
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
+  };
+
+  const appendUploadedFiles = (entries: NonNullable<EventPlan['uploadedFiles']>) => {
+    const current = Array.isArray(eventPlan.uploadedFiles) ? eventPlan.uploadedFiles : [];
+    onManualUpdate({
+      ...eventPlan,
+      uploadedFiles: [...entries, ...current]
+    });
+  };
+
+  const handleUploadedFilesInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || []);
+    if (selectedFiles.length === 0) return;
+    const now = Date.now();
+    const entries = selectedFiles.map((file, idx) => ({
+      id: `${now}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+      name: file.name,
+      kind: newUploadedFileKind,
+      source: 'upload' as const,
+      mimeType: file.type || undefined,
+      sizeBytes: Number.isFinite(file.size) ? file.size : undefined,
+      // Keep an in-browser blob URL so the file is immediately downloadable from Uploaded Files.
+      url: URL.createObjectURL(file),
+      createdAt: now + idx
+    }));
+    appendUploadedFiles(entries);
+    e.target.value = '';
+    showToast(`${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} added.`, 'success');
+  };
+
+  const handleAddUploadedLink = () => {
+    const rawUrl = String(newUploadedLinkUrl || '').trim();
+    if (!rawUrl) {
+      showToast('Enter a file URL first.', 'error');
+      return;
+    }
+    try {
+      // Validate URL format
+      new URL(rawUrl);
+    } catch (_e) {
+      showToast('Enter a valid URL (including https://).', 'error');
+      return;
+    }
+    const now = Date.now();
+    appendUploadedFiles([
+      {
+        id: `${now}-${Math.random().toString(36).slice(2, 7)}`,
+        name: String(newUploadedLinkName || '').trim() || rawUrl,
+        kind: newUploadedFileKind,
+        source: 'link',
+        url: rawUrl,
+        createdAt: now
+      }
+    ]);
+    setNewUploadedLinkName('');
+    setNewUploadedLinkUrl('');
+    showToast('Link added to uploaded files.', 'success');
+  };
+
+  const handleRemoveUploadedFile = (fileId: string) => {
+    const current = Array.isArray(eventPlan.uploadedFiles) ? eventPlan.uploadedFiles : [];
+    const target = current.find((file) => String(file.id) === String(fileId));
+    if (target?.url && String(target.url).startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(target.url);
+      } catch (_e) {
+        // Ignore object URL cleanup issues.
+      }
+    }
+    const next = current.filter((file) => String(file.id) !== String(fileId));
+    onManualUpdate({
+      ...eventPlan,
+      uploadedFiles: next
+    });
+  };
+
+  const handleDownloadUploadedFile = (file: NonNullable<EventPlan['uploadedFiles']>[number]) => {
+    if (file.url) {
+      const a = document.createElement('a');
+      a.href = file.url;
+      a.download = file.name || 'download';
+      a.rel = 'noopener noreferrer';
+      if (!String(file.url).startsWith('blob:')) {
+        a.target = '_blank';
+      }
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    const fallback = [
+      `File: ${file.name || 'Unknown'}`,
+      `Type: ${file.kind || 'unknown'}`,
+      `Source: ${file.source || 'unknown'}`,
+      file.mimeType ? `Mime: ${file.mimeType}` : '',
+      typeof file.sizeBytes === 'number' ? `Size: ${file.sizeBytes}` : '',
+      `Created: ${file.createdAt ? new Date(file.createdAt).toISOString() : 'n/a'}`
+    ].filter(Boolean).join('\n');
+    const blob = new Blob([fallback], { type: 'text/plain;charset=utf-8' });
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = `${(file.name || 'uploaded-file').replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(objectUrl);
   };
 
   const renderOverview = () => (
@@ -1356,9 +1772,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Configure your registration method before generating the page.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-3xl mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full max-w-4xl mb-8">
             <button
-              onClick={() => setIntegrationConfig({ ...integrationConfig, type: 'zoom' })}
+              onClick={() => applyIntegrationSwitch('zoom')}
               className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${integrationConfig.type === 'zoom' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-indigo-300'}`}
             >
               <div className="w-10 h-10 bg-blue-500 text-white rounded-lg flex items-center justify-center">
@@ -1368,7 +1784,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="text-xs text-slate-500">API Integration</span>
             </button>
             <button
-              onClick={() => setIntegrationConfig({ ...integrationConfig, type: 'bigmarker' })}
+              onClick={() => applyIntegrationSwitch('bigmarker')}
               className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${integrationConfig.type === 'bigmarker' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-indigo-300'}`}
             >
               <div className="w-10 h-10 bg-red-500 text-white rounded-lg flex items-center justify-center">
@@ -1378,7 +1794,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="text-xs text-slate-500">API Integration</span>
             </button>
             <button
-              onClick={() => setIntegrationConfig({ ...integrationConfig, type: 'email' })}
+              onClick={() => applyIntegrationSwitch('custom')}
+              className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${integrationConfig.type === 'custom' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-indigo-300'}`}
+            >
+              <div className="w-10 h-10 bg-cyan-500 text-white rounded-lg flex items-center justify-center">
+                <Globe className="w-6 h-6" />
+              </div>
+              <span className="font-semibold text-slate-800">Custom Webinar</span>
+              <span className="text-xs text-slate-500">White Label / External</span>
+            </button>
+            <button
+              onClick={() => applyIntegrationSwitch('email')}
               className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${integrationConfig.type === 'email' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-indigo-300'}`}
             >
               <div className="w-10 h-10 bg-green-500 text-white rounded-lg flex items-center justify-center">
@@ -1389,23 +1815,68 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
           </div>
 
-          {(integrationConfig.type === 'zoom' || integrationConfig.type === 'bigmarker') && (
+          {(integrationConfig.type === 'zoom' || integrationConfig.type === 'bigmarker' || integrationConfig.type === 'custom') && (
             <div className="w-full max-w-md mb-8 animate-fadeIn space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  {integrationConfig.type === 'zoom' ? 'Zoom Webinar ID' : 'BigMarker Conference ID'}
+                  {integrationConfig.type === 'zoom'
+                    ? 'Zoom Webinar ID'
+                    : integrationConfig.type === 'bigmarker'
+                      ? 'BigMarker Conference ID'
+                      : 'Custom Webinar ID / External Reference'}
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={integrationConfig.platformId || ''}
                     onChange={(e) => setIntegrationConfig({ ...integrationConfig, platformId: e.target.value })}
-                    placeholder="e.g., 123456789"
+                    placeholder={integrationConfig.type === 'custom' ? 'e.g., webinar-2026-02 or ext-12345' : 'e.g., 123456789'}
                     className="w-full border border-slate-300 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                   <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 </div>
               </div>
+
+              {integrationConfig.type === 'custom' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Custom Provider Name
+                    </label>
+                    <input
+                      type="text"
+                      value={integrationConfig.platformSettings?.customProviderName || ''}
+                      onChange={(e) => setIntegrationConfig({
+                        ...integrationConfig,
+                        platformSettings: {
+                          ...(integrationConfig.platformSettings || {}),
+                          customProviderName: e.target.value
+                        }
+                      })}
+                      placeholder="e.g., My Webinar Cloud"
+                      className="w-full border border-slate-300 rounded-lg py-2 px-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      External Webinar URL (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={integrationConfig.platformSettings?.customPlatformUrl || ''}
+                      onChange={(e) => setIntegrationConfig({
+                        ...integrationConfig,
+                        platformSettings: {
+                          ...(integrationConfig.platformSettings || {}),
+                          customPlatformUrl: e.target.value
+                        }
+                      })}
+                      placeholder="https://yourwebinar.com/live/abc123"
+                      className="w-full border border-slate-300 rounded-lg py-2 px-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </>
+              )}
 
               {integrationConfig.type === 'bigmarker' && (
                 <div>
@@ -1428,36 +1899,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               )}
 
-              {(integrationConfig.type === 'bigmarker' || integrationConfig.type === 'zoom') && (
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-bold text-slate-700">Form Fields</h4>
-                    <button
-                      onClick={integrationConfig.type === 'zoom' ? handleSyncZoomFields : handleSyncBigMarkerFields}
-                      disabled={isSyncingFields || !integrationConfig.platformId}
-                      className="text-xs text-indigo-600 font-medium flex items-center gap-1 hover:underline disabled:opacity-50 disabled:no-underline"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isSyncingFields ? 'animate-spin' : ''}`} />
-                      {isSyncingFields ? 'Syncing...' : 'Sync Fields'}
-                    </button>
-                  </div>
-
-                  {integrationConfig.customFields ? (
-                    <div className="space-y-1">
-                      {integrationConfig.customFields.map(field => (
-                        <div key={field.id} className="text-xs text-slate-600 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                          <span className="font-mono">{field.label}</span>
-                          <span className="text-slate-400 italic">({field.type})</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400">
-                      Click "Sync Fields" to pull registration fields from {integrationConfig.type === 'zoom' ? 'Zoom' : 'BigMarker'}.
-                    </p>
-                  )}
-                </div>
+              {(integrationConfig.type === 'bigmarker' || integrationConfig.type === 'zoom' || integrationConfig.type === 'custom') && (
+                renderRegistrationFieldsEditor(
+                  `Click "Sync Fields" to refresh registration fields from ${integrationConfig.type === 'zoom' ? 'Zoom' : integrationConfig.type === 'bigmarker' ? 'BigMarker' : 'your custom webinar schema'}.`
+                )
               )}
             </div>
           )}
@@ -1491,11 +1936,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       ) : (
         <div className="flex flex-col h-full space-y-4">
-          <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-            <div className="flex items-center gap-2">
+          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-lg font-semibold text-slate-800">Website Preview</h3>
               <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                {integrationConfig.type === 'email' ? 'Email Form' : `${integrationConfig.type} Integrated`}
+                {integrationConfig.type === 'email' ? 'Email Form' : `${getIntegrationLabel(integrationConfig.type)} Integrated`}
               </span>
               {integrationConfig.type === 'zoom' && (
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -1519,102 +1964,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     : 'BigMarker Conference Missing'}
                 </span>
               )}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowIntegrationSettings(!showIntegrationSettings)}
-                className={`p-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors ${showIntegrationSettings
-                  ? 'bg-indigo-50 text-indigo-600'
-                  : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-              >
-                <RefreshCw className="w-4 h-4" /> Settings
-              </button>
-              {!showCode && (
-                <>
-                  <button
-                    onClick={() => {
-                      if (isEditingLandingDetails) {
-                        handleSaveLandingDetails();
-                      } else {
-                        setIsEditingLandingDetails(true);
-                      }
-                    }}
-                    className={`p-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors ${
-                      isEditingLandingDetails
-                        ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                        : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                    }`}
-                  >
-                    {isEditingLandingDetails ? (
-                      <>
-                        <Save className="w-4 h-4" /> Save Landing
-                      </>
-                    ) : (
-                      <>
-                        <Edit3 className="w-4 h-4" /> Edit Landing
-                      </>
-                    )}
-                  </button>
-                  {isEditingLandingDetails && (
-                    <button
-                      onClick={handleCancelLandingDetails}
-                      className="p-2 rounded-lg flex items-center gap-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-                    >
-                      <X className="w-4 h-4" /> Cancel
-                    </button>
-                  )}
-                </>
+              {integrationConfig.type === 'custom' && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  integrationConfig.platformId
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {integrationConfig.platformId
+                    ? `Custom Webinar Linked (${integrationConfig.platformId})`
+                    : 'Custom Webinar Reference Missing'}
+                </span>
               )}
-              {showCode && (
-                <button
-                  onClick={() => {
-                    if (isEditingHtml) {
-                      handleSaveHtml();
-                    } else {
-                      setIsEditingHtml(true);
-                    }
-                  }}
-                  className={`p-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors ${isEditingHtml
-                    ? 'bg-green-50 text-green-700 hover:bg-green-100'
-                    : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                    }`}
-                >
-                  {isEditingHtml ? (
-                    <>
-                      <Save className="w-4 h-4" /> Save Changes
-                    </>
-                  ) : (
-                    <>
-                      <Edit3 className="w-4 h-4" /> Edit HTML
-                    </>
-                  )}
-                </button>
-              )}
-              <button
-                onClick={() => setShowCode(!showCode)}
-                className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-              >
-                <Code className="w-4 h-4" /> {showCode ? 'View Preview' : 'View Code'}
-              </button>
-              <button
-                onClick={handleDownloadHtml}
-                className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-              >
-                <Download className="w-4 h-4" /> HTML
-              </button>
-              <button
-                onClick={() => {
-                  const win = window.open();
-                  if (win) {
-                    win.document.write(eventPlan.websiteHtml || '');
-                    win.document.close();
-                  }
-                }}
-                className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-              >
-                <ExternalLink className="w-4 h-4" /> Open New Tab
-              </button>
             </div>
           </div>
 
@@ -1689,9 +2049,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 Integration Settings
               </h4>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <button
-                  onClick={() => setIntegrationConfig({ ...integrationConfig, type: 'zoom' })}
+                  onClick={() => applyIntegrationSwitch('zoom')}
                   className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${integrationConfig.type === 'zoom' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-indigo-300'}`}
                 >
                   <div className="w-10 h-10 bg-blue-500 text-white rounded-lg flex items-center justify-center">
@@ -1701,7 +2061,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <span className="text-xs text-slate-500">API Integration</span>
                 </button>
                 <button
-                  onClick={() => setIntegrationConfig({ ...integrationConfig, type: 'bigmarker' })}
+                  onClick={() => applyIntegrationSwitch('bigmarker')}
                   className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${integrationConfig.type === 'bigmarker' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-indigo-300'}`}
                 >
                   <div className="w-10 h-10 bg-red-500 text-white rounded-lg flex items-center justify-center">
@@ -1711,7 +2071,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   <span className="text-xs text-slate-500">API Integration</span>
                 </button>
                 <button
-                  onClick={() => setIntegrationConfig({ ...integrationConfig, type: 'email' })}
+                  onClick={() => applyIntegrationSwitch('custom')}
+                  className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${integrationConfig.type === 'custom' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-indigo-300'}`}
+                >
+                  <div className="w-10 h-10 bg-cyan-500 text-white rounded-lg flex items-center justify-center">
+                    <Globe className="w-6 h-6" />
+                  </div>
+                  <span className="font-semibold text-slate-800">Custom Webinar</span>
+                  <span className="text-xs text-slate-500">White Label / External</span>
+                </button>
+                <button
+                  onClick={() => applyIntegrationSwitch('email')}
                   className={`p-4 border rounded-xl flex flex-col items-center gap-3 transition-all ${integrationConfig.type === 'email' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200 hover:border-indigo-300'}`}
                 >
                   <div className="w-10 h-10 bg-green-500 text-white rounded-lg flex items-center justify-center">
@@ -1722,20 +2092,64 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </button>
               </div>
 
-              {(integrationConfig.type === 'zoom' || integrationConfig.type === 'bigmarker') && (
+              {(integrationConfig.type === 'zoom' || integrationConfig.type === 'bigmarker' || integrationConfig.type === 'custom') && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    {integrationConfig.type === 'zoom' ? 'Zoom Webinar ID' : 'BigMarker Conference ID'}
+                    {integrationConfig.type === 'zoom'
+                      ? 'Zoom Webinar ID'
+                      : integrationConfig.type === 'bigmarker'
+                        ? 'BigMarker Conference ID'
+                        : 'Custom Webinar ID / External Reference'}
                   </label>
                   <div className="relative">
                     <input
                       type="text"
                       value={integrationConfig.platformId || ''}
                       onChange={(e) => setIntegrationConfig({ ...integrationConfig, platformId: e.target.value })}
-                      placeholder="e.g., 123456789"
+                      placeholder={integrationConfig.type === 'custom' ? 'e.g., webinar-2026-02 or ext-12345' : 'e.g., 123456789'}
                       className="w-full border border-slate-300 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                     <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  </div>
+                </div>
+              )}
+              {integrationConfig.type === 'custom' && (
+                <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Custom Provider Name
+                    </label>
+                    <input
+                      type="text"
+                      value={integrationConfig.platformSettings?.customProviderName || ''}
+                      onChange={(e) => setIntegrationConfig({
+                        ...integrationConfig,
+                        platformSettings: {
+                          ...(integrationConfig.platformSettings || {}),
+                          customProviderName: e.target.value
+                        }
+                      })}
+                      placeholder="e.g., My Webinar Cloud"
+                      className="w-full border border-slate-300 rounded-lg py-2 px-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      External Webinar URL (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={integrationConfig.platformSettings?.customPlatformUrl || ''}
+                      onChange={(e) => setIntegrationConfig({
+                        ...integrationConfig,
+                        platformSettings: {
+                          ...(integrationConfig.platformSettings || {}),
+                          customPlatformUrl: e.target.value
+                        }
+                      })}
+                      placeholder="https://yourwebinar.com/live/abc123"
+                      className="w-full border border-slate-300 rounded-lg py-2 px-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    />
                   </div>
                 </div>
               )}
@@ -1768,33 +2182,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               )}
 
-              {(integrationConfig.type === 'zoom' || integrationConfig.type === 'bigmarker') && (
-                <div className="mb-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-bold text-slate-700">Registration Fields</h4>
-                    <button
-                      onClick={integrationConfig.type === 'zoom' ? handleSyncZoomFields : handleSyncBigMarkerFields}
-                      disabled={isSyncingFields || !integrationConfig.platformId}
-                      className="text-xs text-indigo-600 font-medium flex items-center gap-1 hover:underline disabled:opacity-50 disabled:no-underline"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isSyncingFields ? 'animate-spin' : ''}`} />
-                      {isSyncingFields ? 'Syncing...' : 'Sync Fields'}
-                    </button>
-                  </div>
-                  {integrationConfig.customFields ? (
-                    <div className="space-y-1 max-h-36 overflow-auto">
-                      {integrationConfig.customFields.map(field => (
-                        <div key={field.id} className="text-xs text-slate-600 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                          <span className="font-mono">{field.label}</span>
-                          <span className="text-slate-400 italic">({field.type})</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400">
-                      Sync fields before regenerating so landing-page form matches {integrationConfig.type === 'zoom' ? 'Zoom' : 'BigMarker'} registration.
-                    </p>
+              {(integrationConfig.type === 'zoom' || integrationConfig.type === 'bigmarker' || integrationConfig.type === 'custom') && (
+                <div className="mb-4">
+                  {renderRegistrationFieldsEditor(
+                    `Sync fields before regenerating so landing-page form matches ${integrationConfig.type === 'zoom' ? 'Zoom' : integrationConfig.type === 'bigmarker' ? 'BigMarker' : 'Custom Webinar'} registration.`
                   )}
                 </div>
               )}
@@ -1895,6 +2286,71 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return (
       <div className="space-y-6 animate-fadeIn">
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">Add Files</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">File Type</label>
+              <select
+                value={newUploadedFileKind}
+                onChange={(e) => setNewUploadedFileKind(e.target.value as 'agenda' | 'deck')}
+                className="w-full border border-slate-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              >
+                <option value="agenda">Agenda</option>
+                <option value="deck">Deck</option>
+              </select>
+            </div>
+            <div className="md:col-span-3 flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => uploadedFileInputRef.current?.click()}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+              >
+                Upload File
+              </button>
+              <input
+                ref={uploadedFileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleUploadedFilesInputChange}
+                multiple
+              />
+              <p className="text-xs text-slate-500 self-center">Adds metadata to event assets list.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Link Name (Optional)</label>
+              <input
+                type="text"
+                value={newUploadedLinkName}
+                onChange={(e) => setNewUploadedLinkName(e.target.value)}
+                placeholder="Slides Folder"
+                className="w-full border border-slate-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">File URL</label>
+              <input
+                type="url"
+                value={newUploadedLinkUrl}
+                onChange={(e) => setNewUploadedLinkUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full border border-slate-300 rounded-lg py-2 px-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={handleAddUploadedLink}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+              >
+                Add Link
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h3 className="text-lg font-semibold text-slate-800 mb-4">Uploaded Assets</h3>
           {files.length === 0 ? (
             <p className="text-sm text-slate-500">No uploaded files captured for this meeting yet.</p>
@@ -1910,11 +2366,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       {typeof file.sizeBytes === 'number' ? ` • ${(file.sizeBytes / 1024).toFixed(1)} KB` : ''}
                     </p>
                   </div>
-                  {file.url && (
-                    <a href={file.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
-                      Open Link
-                    </a>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadUploadedFile(file)}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      Download
+                    </button>
+                    {file.url && (
+                      <a href={file.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+                        Open Link
+                      </a>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveUploadedFile(String(file.id))}
+                      className="text-xs text-rose-600 hover:text-rose-700 font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -2012,6 +2484,109 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <Globe className="w-5 h-5" />
             Landing Page
           </button>
+          {activeTab === 'website' && (
+            <div className="ml-9 -mt-1 mb-1 space-y-1">
+              <button
+                onClick={async () => {
+                  const url = getLandingSubdomainUrl();
+                  if (!url) return;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    showToast('Landing page subdomain URL copied.', 'success');
+                  } catch (_e) {
+                    showToast(url, 'success');
+                  }
+                }}
+                className="w-full text-left px-3 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+                title={getLandingSubdomainUrl()}
+              >
+                <Globe className="w-3.5 h-3.5" /> Subdomain URL
+              </button>
+              <button
+                onClick={() => setShowIntegrationSettings(!showIntegrationSettings)}
+                className={`w-full text-left px-3 py-1.5 rounded-md text-xs flex items-center gap-2 ${
+                  showIntegrationSettings
+                    ? 'bg-indigo-700 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Settings
+              </button>
+              {!showCode && (
+                <>
+                  <button
+                    onClick={() => {
+                      if (isEditingLandingDetails) {
+                        handleSaveLandingDetails();
+                      } else {
+                        setIsEditingLandingDetails(true);
+                      }
+                    }}
+                    className={`w-full text-left px-3 py-1.5 rounded-md text-xs flex items-center gap-2 ${
+                      isEditingLandingDetails
+                        ? 'bg-emerald-700 text-white'
+                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    {isEditingLandingDetails ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
+                    {isEditingLandingDetails ? 'Save Landing' : 'Edit Landing'}
+                  </button>
+                  {isEditingLandingDetails && (
+                    <button
+                      onClick={handleCancelLandingDetails}
+                      className="w-full text-left px-3 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+                    >
+                      <X className="w-3.5 h-3.5" /> Cancel Edit
+                    </button>
+                  )}
+                </>
+              )}
+              {showCode && (
+                <button
+                  onClick={() => {
+                    if (isEditingHtml) {
+                      handleSaveHtml();
+                    } else {
+                      setIsEditingHtml(true);
+                    }
+                  }}
+                  className={`w-full text-left px-3 py-1.5 rounded-md text-xs flex items-center gap-2 ${
+                    isEditingHtml
+                      ? 'bg-emerald-700 text-white'
+                      : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  {isEditingHtml ? <Save className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
+                  {isEditingHtml ? 'Save HTML' : 'Edit HTML'}
+                </button>
+              )}
+              <button
+                onClick={() => setShowCode(!showCode)}
+                className="w-full text-left px-3 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+              >
+                <Code className="w-3.5 h-3.5" /> {showCode ? 'View Preview' : 'View Code'}
+              </button>
+              <button
+                onClick={handleDownloadHtml}
+                className="w-full text-left px-3 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+              >
+                <Download className="w-3.5 h-3.5" /> Download HTML
+              </button>
+              <button
+                onClick={() => {
+                  const subdomainUrl = getLandingSubdomainUrl();
+                  const win = window.open(subdomainUrl || undefined);
+                  if (win && !subdomainUrl) {
+                    win.document.write(eventPlan.websiteHtml || '');
+                    win.document.close();
+                  }
+                }}
+                className="w-full text-left px-3 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Open New Tab
+              </button>
+            </div>
+          )}
           <button
             onClick={() => setActiveTab('registrants')}
             className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 transition-all ${activeTab === 'registrants' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
